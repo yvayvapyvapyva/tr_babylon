@@ -12,7 +12,6 @@
     border-radius:2px;backdrop-filter:blur(4px);width:280px}
   .title{font-weight:600;margin-bottom:2px}
   .spec{color:#7c93a4;font-size:11px;margin-bottom:4px}
-  #modelStatus{color:#62d0df;font-size:11px;margin-bottom:8px;min-height:16px}
   .filebtn{width:100%;padding:6px 0;margin-bottom:10px;background:#1c2c3a;color:#9db4c4;
     border:1px solid #2a4257;border-radius:2px;font:600 11px/1 inherit;cursor:pointer}
   .filebtn:hover{border-color:#62d0df;color:#62d0df}
@@ -42,12 +41,6 @@
 <canvas id="renderCanvas"></canvas>
 
 <div id="ui">
-  <div class="title">Площадка 100×100 · авто + конусы</div>
-  <div class="spec">масштаб под Logan: 4346×1733×1517 · база 2634 · свесы 818/894 · клиренс 155</div>
-  <div id="modelStatus">Модель: заглушка</div>
-  <select id="autoModel" style="width:100%;padding:6px 4px;margin-bottom:8px;background:#1c2c3a;color:#9db4c4;border:1px solid #2a4257;border-radius:2px;font:600 11px/1 inherit"></select>
-  <button class="filebtn" id="pickModel">Выбрать модель с диска (.glb)…</button>
-  <input type="file" id="modelFile" accept=".glb,.gltf" style="display:none">
   <div class="modes">
     <button data-mode="place" class="active">Поставить</button>
     <button data-mode="move">Двигать</button>
@@ -129,7 +122,6 @@ let car=null,steerPivots=[],spinPivots=[],primitiveRoot=null,modelCarRoot=null;
 let cabMode=false;const cabMats=new Map();
 let headYaw=0,headTurn=false;
 let carHeight=CAR.height;
-const modelStatus=document.getElementById('modelStatus');
 
 function createPrimitiveCar(){
   const root=new BABYLON.TransformNode('car',scene);
@@ -162,7 +154,6 @@ function createPrimitiveCar(){
 }
 function usePrimitiveCar(){const o=createPrimitiveCar();car=o.root;primitiveRoot=o.root;
   steerPivots=o.frontSteers;spinPivots=o.spinNodes.map(n=>({node:n,radius:CAR.wheelR}));
-  modelStatus.textContent='Модель: заглушка — нажми «Выбрать модель с диска»';
   carHeight=CAR.height;
   if(cabMode)applyCabMaterials(true);}
 function disposeCurrentCar(){
@@ -316,7 +307,6 @@ function adoptLoadedModel(newMeshes,label,flip,pitchFlip){
   disposeCurrentCar();
   modelCarRoot=carRoot;car=carRoot;steerPivots=steer;spinPivots=spin;
   car.position.set(0,0,0);
-  modelStatus.textContent=`Модель: ${label}`+(spin.length?` · колёс: ${spin.length}`:' · колёса не найдены');
   if(cabMode)applyCabMaterials(true);
 }
 
@@ -325,82 +315,18 @@ async function loadModelByName(name,pitchFlip){
   const isGLTF=/\.gltf$/i.test(name);
   const isGLB=/\.glb$/i.test(name);
   const flip=/_flip\.(glb|gltf)$/i.test(name);
-  modelStatus.textContent='Загрузка: '+name+'…';
   try{
     const before=new Set(scene.meshes);
     await BABYLON.SceneLoader.AppendAsync('',name,scene,null,isGLTF?'.gltf':'.glb');
     const nm=scene.meshes.filter(m=>!before.has(m));
     if(nm.length)adoptLoadedModel(nm,name,flip,!!pitchFlip);
-    else modelStatus.textContent='Не удалось прочитать: '+name;
   }catch(err){
-    modelStatus.textContent='Ошибка: '+name;
     console.warn(err);
   }
 }
 
 // модели из папки auto — константы с полными названиями и путями
-const CAR_MODELS={
-  'Audi S4':'auto/AudiS4.glb',
-  'BMW M3 Coupe':'auto/BMW_M3_Coupe.glb',
-  'BMW M3 GTR':'auto/BMW_M3_GTR.glb',
-  'BMW Vision':'auto/BMW_Vision.glb',
-  'BYD U9':'auto/BYD_U9.glb',
-  'Logan 2 2017':'auto/Logan2_2017.glb',
-  'Mazda 3':'auto/Mazda3.glb',
-  'Sedan':'auto/Sedan.glb',
-  'Volvo S60R':'auto/VolvoS60R.glb',
-  'Toyota Camry':'auto/toyota_camry.glb',
-  'Toyota Land Cruiser 250':'auto/toyota_landcruiser250.glb',
-};
-const autoModel=document.getElementById('autoModel');
-function fillAutoModel(){
-  autoModel.textContent='';
-  const stub=document.createElement('option');
-  stub.textContent='— заглушка —';stub.value='';autoModel.appendChild(stub);
-  for(const[name,path]of Object.entries(CAR_MODELS)){
-    const o=document.createElement('option');
-    o.textContent=name;o.value=path;autoModel.appendChild(o);
-  }
-}
-fillAutoModel();
-autoModel.addEventListener('change',()=>{
-  const v=autoModel.value;
-  if(!v)usePrimitiveCar();
-  else loadModelByName(v,true);
-});
-
-// выбор файла с диска
-const modelFile=document.getElementById('modelFile');
-document.getElementById('pickModel').addEventListener('click',()=>modelFile.click());
-modelFile.addEventListener('change',async e=>{
-  const file=e.target.files[0];if(!file)return;
-  const nameLow=file.name.toLowerCase();
-  const isGLTF=nameLow.endsWith('.gltf');
-  const isGLB=nameLow.endsWith('.glb');
-  if(!isGLTF && !isGLB){
-    modelStatus.textContent='Нужен файл .glb или .gltf';
-    modelFile.value=''; return;
-  }
-  const flip=/_flip\.(glb|gltf)$/i.test(file.name);
-  const url=URL.createObjectURL(file);
-  modelStatus.textContent='Загрузка: '+file.name+'…';
-  try{
-    const before=new Set(scene.meshes);
-    await BABYLON.SceneLoader.AppendAsync('',url,scene,null,isGLTF?'.gltf':'.glb');
-    const nm=scene.meshes.filter(m=>!before.has(m));
-    if(nm.length)adoptLoadedModel(nm,file.name,flip);
-    else modelStatus.textContent='Не удалось прочитать: '+file.name;
-  }catch(err){
-    modelStatus.textContent='Ошибка: '+file.name;
-    console.warn(err);
-  }finally{
-    setTimeout(()=>URL.revokeObjectURL(url),10000);
-    modelFile.value='';
-  }
-});
-
 usePrimitiveCar();
-autoModel.value='auto/toyota_camry.glb';
 loadModelByName('auto/toyota_camry.glb',true);
 loadCones();
 
@@ -484,10 +410,12 @@ function updateCar(dt){
   let throttle=0,steerInput=0;
   if(keys.forward)throttle+=1;if(keys.back)throttle-=1;
   if(keys.left)steerInput-=1;if(keys.right)steerInput+=1;
-  if(throttle>0)speed+=12*dt;else if(throttle<0)speed-=12*dt;
-  else{if(speed>0)speed=Math.max(0,speed-7*dt);else speed=Math.min(0,speed+7*dt);}
-  if(keys.brake){if(speed>0)speed=Math.max(0,speed-25*dt);else speed=Math.min(0,speed+25*dt);}
-  speed=Math.max(-6,Math.min(8/3.6,speed));
+  const MAXV=8/3.6;
+  let tgt=throttle>0?MAXV:throttle<0?-MAXV:0;
+  if(keys.brake)tgt=0;
+  const tau=keys.brake?0.1:0.35;
+  speed+=(tgt-speed)*(1-Math.exp(-dt/tau));
+  speed=Math.max(-MAXV,Math.min(MAXV,speed));
   const target=steerInput*CAR.maxSteer,rate=1.6;
   if(steerAngle<target)steerAngle=Math.min(target,steerAngle+rate*dt);
   else if(steerAngle>target)steerAngle=Math.max(target,steerAngle-rate*dt);
