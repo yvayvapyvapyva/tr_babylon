@@ -30,6 +30,9 @@
   #clear{width:100%;padding:6px 0;background:#1c2c3a;color:#9db4c4;
     border:1px solid #2a4257;border-radius:2px;font:600 11px/1 inherit;cursor:pointer}
   #clear:hover{border-color:#e05e4a;color:#e05e4a}
+  #cabBtn{width:100%;padding:6px 0;margin-top:6px;background:#1c2c3a;color:#9db4c4;
+    border:1px solid #2a4257;border-radius:2px;font:600 11px/1 inherit;cursor:pointer}
+  #cabBtn:hover,#cabBtn.active{border-color:#62d0df;color:#62d0df}
 </style>
 <script src="https://cdn.babylonjs.com/babylon.js"></script>
 <script src="https://cdn.babylonjs.com/loaders/babylonjs.loaders.min.js"></script>
@@ -55,6 +58,7 @@
   <div class="drive">Езда: <b>W/A/S/D</b> или стрелки · <b>Space</b> — тормоз</div>
   <div class="tele">Скорость: <b id="spd">0</b> км/ч · Руль: <b id="str">0°</b></div>
   <button id="clear">Очистить конусы (C)</button>
+  <button id="cabBtn">Обзор: кабина (V)</button>
 </div>
 
 <script>
@@ -122,6 +126,8 @@ function loadCones(){try{const data=JSON.parse(localStorage.getItem(STORE_KEY)||
 
 // ── машина ─────────────────────────────────────────────
 let car=null,steerPivots=[],spinPivots=[],primitiveRoot=null,modelCarRoot=null;
+let cabMode=false;const cabMats=new Map();
+let headYaw=0,headPitch=0,headTurn=false;
 const modelStatus=document.getElementById('modelStatus');
 
 function createPrimitiveCar(){
@@ -155,7 +161,8 @@ function createPrimitiveCar(){
 }
 function usePrimitiveCar(){const o=createPrimitiveCar();car=o.root;primitiveRoot=o.root;
   steerPivots=o.frontSteers;spinPivots=o.spinNodes.map(n=>({node:n,radius:CAR.wheelR}));
-  modelStatus.textContent='Модель: заглушка — нажми «Выбрать модель с диска»';}
+  modelStatus.textContent='Модель: заглушка — нажми «Выбрать модель с диска»';
+  if(cabMode)applyCabMaterials(true);}
 function disposeCurrentCar(){
   if(primitiveRoot){primitiveRoot.getChildMeshes().forEach(m=>shadowGen.removeShadowCaster(m));primitiveRoot.dispose();primitiveRoot=null;}
   if(modelCarRoot){modelCarRoot.getChildMeshes().forEach(m=>shadowGen.removeShadowCaster(m));modelCarRoot.dispose();modelCarRoot=null;}
@@ -212,6 +219,7 @@ function adoptLoadedModel(newMeshes,label,flip,pitchFlip){
   modelCarRoot=carRoot;car=carRoot;steerPivots=steer;spinPivots=spin;
   car.position.set(0,0,0);
   modelStatus.textContent=`Модель: ${label}`+(spin.length?` · колёс: ${spin.length}`:' · колёса не найдены');
+  if(cabMode)applyCabMaterials(true);
 }
 
 // загрузка модели по url / метке
@@ -301,6 +309,45 @@ camera.attachControl(canvas,true);
 camera.lowerRadiusLimit=5;camera.upperRadiusLimit=220;camera.upperBetaLimit=Math.PI/2-0.02;
 camera.panningSensibility=0;camera.wheelDeltaPercentage=0.01;camera.minZ=0.1;camera.maxZ=1500;
 
+const cabCam=new BABYLON.UniversalCamera('cab',new BABYLON.Vector3(0,1.5,0),scene);
+cabCam.minZ=0.05;cabCam.maxZ=1500;
+const cabBtn=document.getElementById('cabBtn');
+function applyCabMaterials(on){
+  if(!car)return;
+  car.getChildMeshes().forEach(m=>{const mat=m.material;
+    if(!mat||(mat.metadata&&mat.metadata.isCone))return;
+    if(on){if(!cabMats.has(mat))cabMats.set(mat,mat.backFaceCulling);mat.backFaceCulling=false;}
+    else if(cabMats.has(mat)){mat.backFaceCulling=cabMats.get(mat);}});
+}
+function setCabMode(b){
+  cabMode=b;
+  if(b)headYaw=0,headPitch=0;else headTurn=false;
+  cabBtn.textContent=b?'Обзор: сзади (V)':'Обзор: кабина (V)';
+  cabBtn.classList.toggle('active',b);
+  scene.activeCamera=b?cabCam:camera;
+  if(b){camera.detachControl();applyCabMaterials(true);}
+  else{applyCabMaterials(false);camera.detachControl();camera.attachControl(canvas,true);}
+}
+cabBtn.addEventListener('click',()=>setCabMode(!cabMode));
+canvas.addEventListener('pointerdown',()=>{if(cabMode&&!dragging)headTurn=true;});
+addEventListener('pointerup',()=>{headTurn=false;});
+addEventListener('pointercancel',()=>{headTurn=false;});
+addEventListener('blur',()=>{headTurn=false;});
+addEventListener('pointermove',e=>{
+  if(cabMode&&headTurn&&!dragging){
+    headYaw-=e.movementX*0.005;
+    if(headYaw>Math.PI)headYaw-=Math.PI*2;if(headYaw<-Math.PI)headYaw+=Math.PI*2;
+    headPitch=Math.max(-0.75,Math.min(0.75,headPitch-e.movementY*0.005));
+  }
+});
+function driverPoint(localOff){
+  const cs=Math.cos(heading),sn=Math.sin(heading);
+  return new BABYLON.Vector3(
+    car.position.x+localOff.x*cs+localOff.z*sn,
+    car.position.y+localOff.y,
+    car.position.z-localOff.x*sn+localOff.z*cs);
+}
+
 const preview=BABYLON.MeshBuilder.CreateTorus('preview',{diameter:0.4,thickness:0.04,tessellation:28},scene);
 const prevMat=new BABYLON.StandardMaterial('pm',scene);
 prevMat.diffuseColor=new BABYLON.Color3(1,0.43,0);prevMat.emissiveColor=new BABYLON.Color3(1,0.43,0);
@@ -324,7 +371,8 @@ const keyMap={KeyW:'forward',ArrowUp:'forward',KeyS:'back',ArrowDown:'back',
 addEventListener('keydown',e=>{const a=keyMap[e.code];
   if(a!==undefined){keys[a]=true;if(e.code.startsWith('Arrow')||e.code==='Space')e.preventDefault();}
   if(e.code==='Digit1')setMode('place');else if(e.code==='Digit2')setMode('move');
-  else if(e.code==='Digit3')setMode('delete');else if(e.code==='KeyC')clearCones();});
+  else if(e.code==='Digit3')setMode('delete');else if(e.code==='KeyC')clearCones();
+  else if(e.code==='KeyV')setCabMode(!cabMode);});
 addEventListener('keyup',e=>{const a=keyMap[e.code];if(a!==undefined)keys[a]=false;});
 
 let speed=0,heading=0,steerAngle=0;
@@ -408,6 +456,11 @@ scene.onPointerObservable.add(pi=>{const t=pi.type;
     else if(mode==='place'){const p=pickGround();if(p.hit)addConeAt(snap(p.pickedPoint.x),snap(p.pickedPoint.z));}}});
 
 scene.onBeforeRenderObservable.add(()=>{const dt=Math.min(engine.getDeltaTime()/1000,0.05);
+  if(cabMode){
+    const L=10.45,sy=Math.sin(headYaw),cy=Math.cos(headYaw),sp=Math.sin(headPitch),cp=Math.cos(headPitch);
+    cabCam.position.copyFrom(driverPoint(new BABYLON.Vector3(0,1.3,0.45)));
+    cabCam.setTarget(driverPoint(new BABYLON.Vector3(L*sy,-L*cy*sp,L*cy*cp)));
+  }
   updateCar(dt);updateCamera();checkCollisions();});
 engine.runRenderLoop(()=>scene.render());
 addEventListener('resize',()=>engine.resize());
