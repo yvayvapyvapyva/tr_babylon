@@ -50,6 +50,7 @@
   <div id="hintline">Клик по площадке — поставить конус (шаг 0,25 м)</div>
   <div class="drive">Езда: <b>W/A/S/D</b> или стрелки · <b>Space</b> — тормоз · <b>Q/E</b> — поворотник</div>
   <div class="tele">Скорость: <b id="spd">0</b> км/ч · Руль: <b id="str">0°</b></div>
+  <div class="tele" id="blinkdbg">Q/E: поворотники (инициализация…)</div>
   <button id="clear">Очистить конусы (C)</button>
   <button id="cabBtn">Обзор: кабина (V)</button>
 </div>
@@ -125,6 +126,8 @@ let carHeight=CAR.height;
 let steeringWheelNode=null,steeringBaseQuat=null,steeringLocalAxis=null,blinkTimer=0;
 let blinkerLeft=false,blinkerRight=false;
 let leftGlow=null,rightGlow=null,leftZone=null,rightZone=null;
+let leftFGlow=null,rightFGlow=null;
+let leftMirr=null,rightMirr=null;
 
 function createPrimitiveCar(){
   const root=new BABYLON.TransformNode('car',scene);
@@ -314,7 +317,8 @@ function adoptLoadedModel(newMeshes,label,flip,pitchFlip){
   if(cabMode)applyCabMaterials(true);
 }
 
-function clipHalf(mesh,dir,label){
+function clipHalf(mesh,dir,label,band){
+  const B=band||1e9;
   const geo=mesh.geometry;if(!geo)return null;
   const pos=geo.getVerticesData(BABYLON.VertexBuffer.PositionKind);
   const idx=geo.getIndices();if(!idx||!pos)return null;
@@ -327,7 +331,7 @@ function clipHalf(mesh,dir,label){
   for(let i=0;i<idx.length;i+=3){
     const a=idx[i]*3,b=idx[i+1]*3,cc=idx[i+2]*3;
     const cx=(wx(a)+wx(b)+wx(cc))/3;
-    if((dir<0&&cx>-0.002)||(dir>0&&cx<0.002))continue;
+    if((dir<0&&(cx>-0.002||cx<-B))||(dir>0&&(cx<0.002||cx>B)))continue;
     for(const vi of[a,b,cc]){
       const vvi=vi/3;let nv=vmap.get(vvi);
       if(nv===undefined){nv=p.length/3;vmap.set(vvi,nv);
@@ -353,15 +357,35 @@ function clipHalf(mesh,dir,label){
   return m;
 }
 function makeBlinkZone(side,sign,gl,parent){
+  gl.computeWorldMatrix(true);gl.refreshBoundingInfo();
   const b=gl.getBoundingInfo().boundingBox;
-  const cy=b.centerWorld.y,cz=b.maximumWorld.z;
-  const sx=b.maximumWorld.x-b.minimumWorld.x;
-  const m=BABYLON.MeshBuilder.CreateBox('blinkZone'+side,{width:sx*0.55,height:0.08,depth:0.012},scene);
-  m.position.set(sign*sx*0.34,cy,cz+0.012);
+  const cw=b.centerWorld;
+  const ex=b.maximumWorld.x-b.minimumWorld.x;
+  const m=BABYLON.MeshBuilder.CreateBox('blinkZone'+side,{width:ex*0.55,height:0.08,depth:0.012},scene);
+  m.position.set(cw.x+sign*ex*0.18,cw.y,b.maximumWorld.z+0.012);
   m.parent=parent;
   const mat=new BABYLON.StandardMaterial('blinkZMat'+side,scene);
   mat.emissiveColor=new BABYLON.Color3(1,0.6,0.1);
-  mat.diffuseColor=new BABYLON.Color3(0.15,0.09,0.02);
+  mat.diffuseColor=new BABYLON.Color3(0.4,0.28,0.05);
+  mat.specularColor=new BABYLON.Color3(0,0,0);
+  mat.backFaceCulling=false;
+  m.material=mat;m.isPickable=false;m.isVisible=false;
+  return m;
+}
+function makeMirrorZone(side,mir,parent){
+  mir.computeWorldMatrix(true);mir.refreshBoundingInfo();
+  const b=mir.getBoundingInfo().boundingBox;
+  const cw=b.centerWorld;
+  const ex=b.maximumWorld.x-b.minimumWorld.x;
+  const dz=b.maximumWorld.z-b.minimumWorld.z;
+  const m=BABYLON.MeshBuilder.CreateBox('mirBlink'+side,{width:0.015,height:0.022,depth:Math.max(0.12,dz*0.4)},scene);
+  const out=Math.sign(cw.x)||1;
+  m.position.set(cw.x+out*(ex/2+0.012),cw.y,b.minimumWorld.z+Math.max(0.05,dz*0.35));
+  m.parent=parent;
+  const mat=new BABYLON.StandardMaterial('mirBlinkMat'+side,scene);
+  mat.emissiveColor=new BABYLON.Color3(1,0.85,0.2);
+  mat.emissiveIntensity=3;
+  mat.diffuseColor=new BABYLON.Color3(0.5,0.42,0.08);
   mat.specularColor=new BABYLON.Color3(0,0,0);
   mat.backFaceCulling=false;
   m.material=mat;m.isPickable=false;m.isVisible=false;
@@ -371,6 +395,8 @@ function setupCarExtras(modelRoot){
   steeringWheelNode=null;steeringBaseQuat=null;steeringLocalAxis=null;blinkTimer=0;
   blinkerLeft=false;blinkerRight=false;
   leftGlow=rightGlow=null;if(leftZone){leftZone.dispose();rightZone.dispose();leftZone=rightZone=null;}
+  if(leftFGlow){leftFGlow.dispose();rightFGlow.dispose();leftFGlow=rightFGlow=null;}
+  if(leftMirr){leftMirr.dispose();rightMirr.dispose();leftMirr=rightMirr=null;}
   const parts=modelRoot.getChildMeshes();
   const wheels=parts.filter(m=>/steering_wheel/i.test(m.name));
   const wn=wheels.length?wheels[0].parent:null;
@@ -421,20 +447,47 @@ function setupCarExtras(modelRoot){
   const glowM=parts.find(m=>/rear_indicator/i.test(m.name)&&/_glow/i.test(m.name));
   if(glowM){
     leftGlow=clipHalf(glowM,-1,'_tL');rightGlow=clipHalf(glowM,1,'_tR');
-    if(leftGlow&&rightGlow)glowM.isVisible=false;
+    if(leftGlow&&rightGlow){
+      glowM.isVisible=false;
+      const gmat=glowM.material&&glowM.material.clone?glowM.material.clone('rearGlowY'+glowM.name):null;
+      if(gmat&&gmat.emissiveColor){gmat.emissiveColor.set(1,0.9,0.2);}
+      if(gmat&&gmat.emissiveIntensity!==undefined)gmat.emissiveIntensity=4;
+      leftGlow.material=gmat;rightGlow.material=gmat;
+    }
     else{leftGlow=rightGlow=null;}
   }
-  const gl=parts.find(m=>/headlight/i.test(m.name)&&/glass_light/i.test(m.name));
-  if(gl){
-    leftZone=makeBlinkZone('L',-1,gl,modelRoot);rightZone=makeBlinkZone('R',1,gl,modelRoot);
+  const hg=parts.find(m=>/headlight/i.test(m.name)&&/glass_light/i.test(m.name));
+  if(hg){
+    leftFGlow=clipHalf(hg,-1,'_fL',0.58);rightFGlow=clipHalf(hg,1,'_fR',0.58);
+    if(leftFGlow&&rightFGlow){
+      const gmat=hg.material&&hg.material.clone?hg.material.clone('headGlowY'+hg.name):null;
+      if(gmat){
+        if(gmat.emissiveColor)gmat.emissiveColor.copyFrom(new BABYLON.Color3(1,0.6,0.1));
+        if(gmat.emissiveIntensity!==undefined)gmat.emissiveIntensity=3;
+        if(gmat.albedoColor)gmat.albedoColor.copyFrom(new BABYLON.Color3(1,0.55,0.08));
+      }
+      leftFGlow.material=gmat;rightFGlow.material=gmat;
+    }
+    else leftFGlow=rightFGlow=null;
+  }
+  const mirrors=parts.filter(m=>/mirror/i.test(m.name)&&/door_mesh/i.test(m.name));
+  if(mirrors.length){
+    let mNeg=null,mPos=null;
+    mirrors.forEach(m=>{
+      m.computeWorldMatrix(true);
+      const cx=m.getBoundingInfo().boundingBox.centerWorld.x;
+      if(cx<0)mNeg=m;else mPos=m;
+    });
+    leftMirr=mNeg?makeMirrorZone('L',mNeg,car):null;
+    rightMirr=mPos?makeMirrorZone('R',mPos,car):null;
   }
 }
 function toggleBlink(){
   const on=(blinkTimer%0.55)<0.30;
-  if(blinkerLeft){if(leftGlow)leftGlow.isVisible=on;if(leftZone)leftZone.isVisible=on;}
-  else{if(leftGlow)leftGlow.isVisible=false;if(leftZone)leftZone.isVisible=false;}
-  if(blinkerRight){if(rightGlow)rightGlow.isVisible=on;if(rightZone)rightZone.isVisible=on;}
-  else{if(rightGlow)rightGlow.isVisible=false;if(rightZone)rightZone.isVisible=false;}
+  if(blinkerLeft){if(leftGlow)leftGlow.isVisible=on;if(leftFGlow)leftFGlow.isVisible=on;if(leftMirr)leftMirr.isVisible=on;}
+  else{if(leftGlow)leftGlow.isVisible=false;if(leftFGlow)leftFGlow.isVisible=false;if(leftMirr)leftMirr.isVisible=false;}
+  if(blinkerRight){if(rightGlow)rightGlow.isVisible=on;if(rightFGlow)rightFGlow.isVisible=on;if(rightMirr)rightMirr.isVisible=on;}
+  else{if(rightGlow)rightGlow.isVisible=false;if(rightFGlow)rightFGlow.isVisible=false;if(rightMirr)rightMirr.isVisible=false;}
 }
 
 // загрузка модели по url / метке
@@ -482,7 +535,27 @@ function setCabMode(b){
   else{applyCabMaterials(false);camera.detachControl();camera.attachControl(canvas,true);}
 }
 cabBtn.addEventListener('click',()=>setCabMode(!cabMode));
-canvas.addEventListener('pointerdown',()=>{if(cabMode&&!dragging)headTurn=true;});
+canvas.addEventListener('pointerdown',e=>{
+  if(pickMode){
+    const r=canvas.getBoundingClientRect();
+    const hit=scene.pick(e.clientX-r.left,e.clientY-r.top,
+      m=>!(m.name==='ground'||m.name==='grid'||(m.metadata&&m.metadata.isCone)||m.name==='axes'||m.name==='preview'));
+    const pm=hit&&hit.pickedMesh?hit.pickedMesh:null;
+    let desc='ничего';
+    if(pm){
+      let col='';
+      const c=pm.material&&(pm.material.albedoColor||pm.material.diffuseColor);
+      if(c)col=' A='+c.r.toFixed(1)+','+c.g.toFixed(1)+','+c.b.toFixed(1);
+      desc=pm.name+' | '+((pm.material&&pm.material.name)||'-')+col;
+    }
+    console.log('PICK::'+desc);
+    pickMode=false;
+    const h=document.getElementById('hintline');
+    if(h)h.textContent='Выбрана деталь: '+desc;
+    return;
+  }
+  if(cabMode&&!dragging)headTurn=true;
+});
 addEventListener('pointerup',()=>{headTurn=false;});
 addEventListener('pointercancel',()=>{headTurn=false;});
 addEventListener('blur',()=>{headTurn=false;});
@@ -519,6 +592,7 @@ function setMode(m){mode=m;
 document.querySelectorAll('.modes button').forEach(b=>b.addEventListener('click',()=>setMode(b.dataset.mode)));
 document.getElementById('clear').addEventListener('click',clearCones);
 
+let pickMode=false;
 const keys={forward:false,back:false,left:false,right:false,brake:false};
 const keyMap={KeyW:'forward',ArrowUp:'forward',KeyS:'back',ArrowDown:'back',
   KeyA:'left',ArrowLeft:'left',KeyD:'right',ArrowRight:'right',Space:'brake'};
@@ -527,6 +601,9 @@ addEventListener('keydown',e=>{const a=keyMap[e.code];
   if(e.code==='Digit1')setMode('place');else if(e.code==='Digit2')setMode('move');
   else if(e.code==='Digit3')setMode('delete');else if(e.code==='KeyC')clearCones();
   else if(e.code==='KeyV')setCabMode(!cabMode);
+  else if(e.code==='KeyP'){pickMode=!pickMode;
+    const h=document.getElementById('hintline');
+    if(h)h.textContent=pickMode?'РЕЖИМ ВЫБОРА: кликни по нужной секции фары':'Клик по площадке — поставить конус (шаг 0,25 м)';}
   else if(e.code==='KeyQ'){blinkerLeft=!blinkerLeft;if(blinkerLeft)blinkerRight=false;}
   else if(e.code==='KeyE'){blinkerRight=!blinkerRight;if(blinkerRight)blinkerLeft=false;}
 });
@@ -562,6 +639,17 @@ function updateCar(dt){
   spinPivots.forEach(sp=>sp.node.rotation.x+=roll/sp.radius);
   steerPivots.forEach(s=>s.rotation.y=steerAngle);
   blinkTimer+=dt;toggleBlink();
+  const bdbg=document.getElementById('blinkdbg');
+  if(bdbg){
+    const on=(blinkTimer%0.55)<0.30;
+    const gv=m=>m?(m.isVisible?'1':'0'):'-';
+    bdbg.textContent='Q: '+(blinkerLeft?(on?'ОН':'огн'):'ВЫКЛ')
+      +' | E: '+(blinkerRight?(on?'ОН':'огн'):'ВЫКЛ')
+      +' | задG '+gv(leftGlow)+'/'+gv(rightGlow)
+      +' | фара '+gv(leftFGlow)+'/'+gv(rightFGlow)
+      +' | зер '+gv(leftMirr)+'/'+gv(rightMirr)
+      +(blinkerLeft||blinkerRight?(' | мат '+(leftGlow&&leftGlow.material?leftGlow.material.emissiveColor.r.toFixed(2)+','+leftGlow.material.emissiveColor.g.toFixed(2):'-')):'');
+  }
   if(steeringWheelNode){
     steeringWheelNode.rotationQuaternion=steeringBaseQuat.multiply(
       BABYLON.Quaternion.RotationAxis(steeringLocalAxis,-steerAngle/CAR.maxSteer*Math.PI*3));
