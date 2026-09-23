@@ -208,10 +208,19 @@ function adoptLoadedModel(newMeshes,label,flip,pitchFlip){
   const steer=[],spin=[];
   const parts=modelRoot.getChildMeshes();
   parts.forEach(m=>{shadowGen.addShadowCaster(m);m.isPickable=false;});
-  const wheelMeshes=parts.filter(m=>/wheel|tire|tyre|roue/i.test(m.name));
+  const isWheelName=n=>/wheel|tire|tyre|roue/i.test(n)&&!/steering/i.test(n);
+  const wheelMeshes=[],wheelAncestors=new Set();
+  parts.forEach(m=>{
+    if(!isWheelName(m.name))return;
+    let a=m.parent;
+    while(a&&a!==modelRoot){if(wheelAncestors.has(a))return;a=a.parent;}
+    wheelMeshes.push(m);wheelAncestors.add(m);
+  });
   wheelMeshes.forEach(wm=>{try{
     wm.computeWorldMatrix(true);
     const b=wm.getBoundingInfo().boundingBox,c=b.centerWorld,r=(b.maximumWorld.y-b.minimumWorld.y)/2;
+    const key=Math.round(c.x/0.4)+'_'+Math.round(c.z/0.4);
+    if(wheelAncestors.has(key))return;wheelAncestors.add(key);
     let pivotParent=carRoot,off=c;
     if(c.z>0){const st=new BABYLON.TransformNode('steer',scene);st.parent=carRoot;st.position.set(c.x,0,c.z);
       steer.push(st);pivotParent=st;off=new BABYLON.Vector3(0,c.y,0);}
@@ -254,6 +263,8 @@ const CAR_MODELS={
   'Mazda 3':'auto/Mazda3.glb',
   'Sedan':'auto/Sedan.glb',
   'Volvo S60R':'auto/VolvoS60R.glb',
+  'Toyota Camry':'auto/toyota_camry.glb',
+  'Toyota Land Cruiser 250':'auto/toyota_landcruiser250.glb',
 };
 const autoModel=document.getElementById('autoModel');
 function fillAutoModel(){
