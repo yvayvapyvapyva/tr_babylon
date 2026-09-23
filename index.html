@@ -71,7 +71,7 @@ const hemi=new BABYLON.HemisphericLight('hemi',new BABYLON.Vector3(0,1,0),scene)
 const dir=new BABYLON.DirectionalLight('dir',new BABYLON.Vector3(-0.5,-1,-0.3),scene);
 dir.position=new BABYLON.Vector3(60,90,40);dir.intensity=0.9;
 const shadowGen=new BABYLON.ShadowGenerator(2048,dir);
-shadowGen.useBlurExponentialShadowMap=true;shadowGen.blurKernel=32;
+shadowGen.useBlurExponentialShadowMap=true;shadowGen.blurKernel=16;
 
 const ground=BABYLON.MeshBuilder.CreateGround('ground',{width:100,height:100,subdivisions:2},scene);
 const groundMat=new BABYLON.StandardMaterial('gmat',scene);
@@ -698,14 +698,18 @@ scene.onPointerObservable.add(pi=>{const t=pi.type;
     if(mode==='delete'){const c=pickCone();if(c.hit)deleteCone(c.pickedMesh.parent);}
     else if(mode==='place'){const p=pickGround();if(p.hit)addConeAt(snap(p.pickedPoint.x),snap(p.pickedPoint.z));}}});
 
-scene.onBeforeRenderObservable.add(()=>{const dt=Math.min(engine.getDeltaTime()/1000,0.05);
+const PHYS=1/120;let physAcc=0;
+scene.onBeforeRenderObservable.add(()=>{
+  const realDt=Math.min(engine.getDeltaTime()/1000,0.1);
+  physAcc=Math.min(physAcc+realDt,0.25);
+  while(physAcc>=PHYS){updateCar(PHYS);physAcc-=PHYS;}
   if(cabMode){
     const L=10.45,HX=-0.38,HY=carHeight*0.85,HZ=-0.1,
       sy=Math.sin(headYaw),cy=Math.cos(headYaw);
     cabCam.position.copyFrom(driverPoint(new BABYLON.Vector3(HX,HY,HZ)));
     cabCam.setTarget(driverPoint(new BABYLON.Vector3(HX+L*sy,HY+L*Math.tan(headPitch),HZ+L*cy)));
   }
-  updateCar(dt);updateCamera();checkCollisions();});
+  updateCamera();checkCollisions();});
 engine.runRenderLoop(()=>scene.render());
 addEventListener('resize',()=>engine.resize());
 setMode('place');
