@@ -127,7 +127,8 @@ function loadCones(){try{const data=JSON.parse(localStorage.getItem(STORE_KEY)||
 // ── машина ─────────────────────────────────────────────
 let car=null,steerPivots=[],spinPivots=[],primitiveRoot=null,modelCarRoot=null;
 let cabMode=false;const cabMats=new Map();
-let headYaw=0,headPitch=0,headTurn=false;
+let headYaw=0,headTurn=false;
+let carHeight=CAR.height;
 const modelStatus=document.getElementById('modelStatus');
 
 function createPrimitiveCar(){
@@ -162,6 +163,7 @@ function createPrimitiveCar(){
 function usePrimitiveCar(){const o=createPrimitiveCar();car=o.root;primitiveRoot=o.root;
   steerPivots=o.frontSteers;spinPivots=o.spinNodes.map(n=>({node:n,radius:CAR.wheelR}));
   modelStatus.textContent='Модель: заглушка — нажми «Выбрать модель с диска»';
+  carHeight=CAR.height;
   if(cabMode)applyCabMaterials(true);}
 function disposeCurrentCar(){
   if(primitiveRoot){primitiveRoot.getChildMeshes().forEach(m=>shadowGen.removeShadowCaster(m));primitiveRoot.dispose();primitiveRoot=null;}
@@ -202,6 +204,7 @@ function adoptLoadedModel(newMeshes,label,flip,pitchFlip){
   modelRoot.computeWorldMatrix(true);bb=aggregateBB(modelRoot);
   modelRoot.position.x-=bb.center.x;modelRoot.position.z-=bb.center.z;modelRoot.position.y-=bb.min.y;
   modelRoot.computeWorldMatrix(true);
+  carHeight=bb.size.y;
   const steer=[],spin=[];
   const parts=modelRoot.getChildMeshes();
   parts.forEach(m=>{shadowGen.addShadowCaster(m);m.isPickable=false;});
@@ -321,7 +324,7 @@ function applyCabMaterials(on){
 }
 function setCabMode(b){
   cabMode=b;
-  if(b)headYaw=0,headPitch=0;else headTurn=false;
+  if(b)headYaw=0;else headTurn=false;
   cabBtn.textContent=b?'Обзор: сзади (V)':'Обзор: кабина (V)';
   cabBtn.classList.toggle('active',b);
   scene.activeCamera=b?cabCam:camera;
@@ -337,7 +340,6 @@ addEventListener('pointermove',e=>{
   if(cabMode&&headTurn&&!dragging){
     headYaw-=e.movementX*0.005;
     if(headYaw>Math.PI)headYaw-=Math.PI*2;if(headYaw<-Math.PI)headYaw+=Math.PI*2;
-    headPitch=Math.max(-0.75,Math.min(0.75,headPitch-e.movementY*0.005));
   }
 });
 function driverPoint(localOff){
@@ -457,9 +459,10 @@ scene.onPointerObservable.add(pi=>{const t=pi.type;
 
 scene.onBeforeRenderObservable.add(()=>{const dt=Math.min(engine.getDeltaTime()/1000,0.05);
   if(cabMode){
-    const L=10.45,sy=Math.sin(headYaw),cy=Math.cos(headYaw),sp=Math.sin(headPitch),cp=Math.cos(headPitch);
-    cabCam.position.copyFrom(driverPoint(new BABYLON.Vector3(0,1.3,0.45)));
-    cabCam.setTarget(driverPoint(new BABYLON.Vector3(L*sy,-L*cy*sp,L*cy*cp)));
+    const L=10.45,HX=-0.38,HY=carHeight*0.85,HZ=-0.1,
+      sy=Math.sin(headYaw),cy=Math.cos(headYaw);
+    cabCam.position.copyFrom(driverPoint(new BABYLON.Vector3(HX,HY,HZ)));
+    cabCam.setTarget(driverPoint(new BABYLON.Vector3(HX+L*sy,HY,HZ+L*cy)));
   }
   updateCar(dt);updateCamera();checkCollisions();});
 engine.runRenderLoop(()=>scene.render());
