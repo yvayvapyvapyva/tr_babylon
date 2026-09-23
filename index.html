@@ -122,7 +122,7 @@ let car=null,steerPivots=[],spinPivots=[],primitiveRoot=null,modelCarRoot=null;
 let cabMode=false;const cabMats=new Map();
 let headYaw=0,headPitch=0,headTurn=false;
 let carHeight=CAR.height;
-let steeringWheelNode=null,steeringBaseQuat=null,blinkTimer=0;
+let steeringWheelNode=null,steeringBaseQuat=null,steeringLocalAxis=null,blinkTimer=0;
 let blinkerLeft=false,blinkerRight=false;
 let leftGlow=null,rightGlow=null,leftZone=null,rightZone=null;
 
@@ -368,12 +368,11 @@ function makeBlinkZone(side,sign,gl,parent){
   return m;
 }
 function setupCarExtras(modelRoot){
-  steeringWheelNode=null;steeringBaseQuat=null;blinkTimer=0;
+  steeringWheelNode=null;steeringBaseQuat=null;steeringLocalAxis=null;blinkTimer=0;
   blinkerLeft=false;blinkerRight=false;
   leftGlow=rightGlow=null;if(leftZone){leftZone.dispose();rightZone.dispose();leftZone=rightZone=null;}
   const parts=modelRoot.getChildMeshes();
-  const wheels=parts.filter(m=>/steering_wheel/i.test(m.name)
-    &&!/_Dash_Screen|_Dash_Chrome|_Dash_Plsatic|_Dash_Plastic_N/i.test(m.name));
+  const wheels=parts.filter(m=>/steering_wheel/i.test(m.name));
   const wn=wheels.length?wheels[0].parent:null;
   if(wn&&wheels.length){
     const pivot=new BABYLON.TransformNode('SWpivot',scene);
@@ -392,7 +391,11 @@ function setupCarExtras(modelRoot){
     wheels.forEach(m=>m.setParent(pivot,true));
     steeringWheelNode=pivot;
     steeringBaseQuat=pivot.rotationQuaternion.clone();
-  }
+    const inv=pivot.getWorldMatrix(true).clone().invert();
+    const tilt=0.25;
+    const wAxis=new BABYLON.Vector3(0,-Math.sin(tilt),Math.cos(tilt));
+    steeringLocalAxis=BABYLON.Vector3.TransformNormal(wAxis,inv).normalize();
+  }else steeringLocalAxis=null;
   const glowM=parts.find(m=>/rear_indicator/i.test(m.name)&&/_glow/i.test(m.name));
   if(glowM){
     leftGlow=clipHalf(glowM,-1,'_tL');rightGlow=clipHalf(glowM,1,'_tR');
@@ -539,7 +542,7 @@ function updateCar(dt){
   blinkTimer+=dt;toggleBlink();
   if(steeringWheelNode){
     steeringWheelNode.rotationQuaternion=steeringBaseQuat.multiply(
-      BABYLON.Quaternion.RotationAxis(BABYLON.Axis.Y,steerAngle*10));
+      BABYLON.Quaternion.RotationAxis(steeringLocalAxis,steerAngle*10));
   }
   spdEl.textContent=Math.round(Math.abs(speed)*3.6);
   const deg=Math.round(steerAngle*180/Math.PI);
