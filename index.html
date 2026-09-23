@@ -317,6 +317,10 @@ addEventListener('keyup',e=>{const a=keyMap[e.code];if(a!==undefined)keys[a]=fal
 
 let speed=0,heading=0,steerAngle=0;
 const spdEl=document.getElementById('spd'),strEl=document.getElementById('str');
+function rearAxleOffset(){
+  const zs=spinPivots.map(p=>p.node.position.z).filter(z=>z<0);
+  return zs.length?zs.reduce((a,b)=>a+b,0)/zs.length:-CAR.wheelbase/2;
+}
 function updateCar(dt){
   let throttle=0,steerInput=0;
   if(keys.forward)throttle+=1;if(keys.back)throttle-=1;
@@ -329,11 +333,13 @@ function updateCar(dt){
   if(steerAngle<target)steerAngle=Math.min(target,steerAngle+rate*dt);
   else if(steerAngle>target)steerAngle=Math.max(target,steerAngle-rate*dt);
   heading+=(speed/CAR.wheelbase)*Math.tan(steerAngle)*dt;
+  const s=Math.sin(heading),c=Math.cos(heading);
+  const rz=rearAxleOffset();
+  let rx=car.position.x+rz*s,rzw=car.position.z+rz*c;
+  rx+=s*speed*dt;rzw+=c*speed*dt;
+  car.position.x=Math.max(-48,Math.min(48,rx-rz*s));
+  car.position.z=Math.max(-48,Math.min(48,rzw-rz*c));
   car.rotation.y=heading;
-  const fwd=new BABYLON.Vector3(Math.sin(heading),0,Math.cos(heading));
-  car.position.addInPlace(fwd.scale(speed*dt));
-  car.position.x=Math.max(-48,Math.min(48,car.position.x));
-  car.position.z=Math.max(-48,Math.min(48,car.position.z));
   const roll=speed*dt;
   spinPivots.forEach(sp=>sp.node.rotation.x+=roll/sp.radius);
   steerPivots.forEach(s=>s.rotation.y=steerAngle);
