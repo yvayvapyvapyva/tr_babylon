@@ -1,351 +1,345 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Седан — просмотр 3D моделей</title>
-  <style>
-    html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; background: #1a1d24; font-family: system-ui, sans-serif; }
-    #renderCanvas { width: 100%; height: 100%; display: block; outline: none; }
-    #ui {
-      position: absolute; top: 12px; left: 12px; z-index: 10;
-      background: rgba(20,23,30,.85); color: #e8eaf0;
-      padding: 12px 14px; border-radius: 10px; border: 1px solid rgba(255,255,255,.08);
-      font-size: 13px; backdrop-filter: blur(6px); min-width: 180px;
-      box-shadow: 0 6px 24px rgba(0,0,0,.35); user-select: none;
-    }
-    #ui h1 { font-size: 14px; margin: 0 0 8px; color: #fff; font-weight: 600; }
-    #ui select {
-      width: 100%; margin: 2px 0 8px; padding: 4px 6px; font-size: 13px;
-      background: #2a2e38; color: #e8eaf0; border: 1px solid rgba(255,255,255,.12);
-      border-radius: 6px; outline: none; cursor: pointer;
-    }
-    #ui label { display: flex; align-items: center; gap: 6px; cursor: pointer; margin-top: 4px; }
-    #ui input[type="checkbox"] { accent-color: #4f8cff; cursor: pointer; }
-    #ui .hint { margin-top: 8px; font-size: 11px; color: #9aa2b1; }
-    #ui .btnrow { display: flex; gap: 6px; margin-top: 6px; }
-    #ui button {
-      flex: 1; padding: 3px 6px; font-size: 11px; color: #c8ccd6;
-      background: #2a2e38; border: 1px solid rgba(255,255,255,.12); border-radius: 6px;
-      cursor: pointer;
-    }
-    #ui button:hover { background: #343a46; }
-    #interiorBtns { display: none; }
-    #fps { color: #6fd37f; font-variant-numeric: tabular-nums; }
-    #loading {
-      position: absolute; inset: 0; z-index: 20; display: flex;
-      align-items: center; justify-content: center; flex-direction: column;
-      background: #1a1d24; color: #c8ccd6; font-size: 14px; transition: opacity .4s;
-    }
-    #loading.hidden { opacity: 0; pointer-events: none; }
-    .spinner {
-      width: 40px; height: 40px; margin-bottom: 14px;
-      border: 3px solid rgba(79,140,255,.25); border-top-color: #4f8cff;
-      border-radius: 50%; animation: spin 0.9s linear infinite;
-    }
-    @keyframes spin { to { transform: rotate(360deg); } }
-    #saveBtn { margin-top: 8px; }
-  </style>
+<meta charset="UTF-8">
+<title>Площадка 100×100 · модель с диска + конусы</title>
+<style>
+  html,body{margin:0;height:100%;background:#111;overflow:hidden}
+  #renderCanvas{width:100%;height:100%;display:block;outline:none;touch-action:none}
+  #ui{position:fixed;left:16px;top:16px;z-index:10;
+    font:13px/1.5 'IBM Plex Sans',system-ui,sans-serif;color:#d8e5ee;
+    background:rgba(12,22,32,.85);border:1px solid #2a4257;padding:12px 14px;
+    border-radius:2px;backdrop-filter:blur(4px);width:280px}
+  .title{font-weight:600;margin-bottom:2px}
+  .spec{color:#7c93a4;font-size:11px;margin-bottom:4px}
+  #modelStatus{color:#62d0df;font-size:11px;margin-bottom:8px;min-height:16px}
+  .filebtn{width:100%;padding:6px 0;margin-bottom:10px;background:#1c2c3a;color:#9db4c4;
+    border:1px solid #2a4257;border-radius:2px;font:600 11px/1 inherit;cursor:pointer}
+  .filebtn:hover{border-color:#62d0df;color:#62d0df}
+  .modes{display:flex;gap:6px;margin-bottom:10px}
+  .modes button{flex:1;padding:7px 4px;background:#1c2c3a;color:#9db4c4;
+    border:1px solid #2a4257;border-radius:2px;font:600 11px/1.2 inherit;cursor:pointer;transition:.15s}
+  .modes button:hover{border-color:#ff6d00;color:#ff6d00}
+  .modes button.active{background:#ff6d00;color:#1a1200;border-color:#ff6d00}
+  .count{margin-bottom:6px}.count b{color:#ff6d00}
+  #hintline{color:#7c93a4;font-size:12px;margin-bottom:4px;min-height:18px}
+  .drive{color:#7c93a4;font-size:11px;margin-bottom:6px}
+  .drive b{color:#9db4c4}
+  .tele{color:#9db4c4;font-size:12px;margin-bottom:10px}
+  .tele b{color:#62d0df}
+  #clear{width:100%;padding:6px 0;background:#1c2c3a;color:#9db4c4;
+    border:1px solid #2a4257;border-radius:2px;font:600 11px/1 inherit;cursor:pointer}
+  #clear:hover{border-color:#e05e4a;color:#e05e4a}
+</style>
+<script src="https://cdn.babylonjs.com/babylon.js"></script>
+<script src="https://cdn.babylonjs.com/loaders/babylonjs.loaders.min.js"></script>
 </head>
 <body>
-  <div id="loading">
-    <div class="spinner"></div>
-    <div>Загрузка модели…</div>
+
+<canvas id="renderCanvas"></canvas>
+
+<div id="ui">
+  <div class="title">Площадка 100×100 · авто + конусы</div>
+  <div class="spec">масштаб под Logan: 4354×1733×1517 · база 2634 · клиренс 155</div>
+  <div id="modelStatus">Модель: заглушка</div>
+  <button class="filebtn" id="pickModel">Выбрать модель с диска (.glb)…</button>
+  <input type="file" id="modelFile" accept=".glb,.gltf" style="display:none">
+  <div class="modes">
+    <button data-mode="place" class="active">Поставить</button>
+    <button data-mode="move">Двигать</button>
+    <button data-mode="delete">Удалить</button>
   </div>
+  <div class="count">Конусов: <b id="count">0</b></div>
+  <div id="hintline">Клик по площадке — поставить конус (шаг 0,25 м)</div>
+  <div class="drive">Езда: <b>W/A/S/D</b> или стрелки · <b>Space</b> — тормоз</div>
+  <div class="tele">Скорость: <b id="spd">0</b> км/ч · Руль: <b id="str">0°</b></div>
+  <button id="clear">Очистить конусы (C)</button>
+</div>
 
-  <div id="ui">
-    <h1>Просмотр 3D модели</h1>
-    <select id="modelSelect">
-      <option value="Sedan.glb">Toyota Mark X (реалистичная)</option>
-      <option value="VolvoS60R.glb">Volvo S60 R (2004)</option>
-      <option value="Logan2_2017.glb">Логан 2 (low-poly)</option>
-      <option value="BMW_M3_GTR.glb">BMW M3 GTR</option>
-      <option value="BMW_M3_Coupe.glb">BMW M3 (E46)</option>
-      <option value="BMW_Vision.glb">BMW Vision Neue Klasse</option>
-      <option value="BYD_U9.glb">BYD Yangwang U9</option>
-      <option value="Mazda3.glb">Mazda 3 (2011)</option>
-      <option value="AudiS4.glb">Audi S4</option>
-    </select>
-    <label><input type="checkbox" id="wireframe"> Каркас (wireframe)</label>
-    <label><input type="checkbox" id="grid" checked> Сетка / пол</label>
-    <label><input type="checkbox" id="auto"> Автовращение</label>
-    <label><input type="checkbox" id="interior"> Салон (обзор изнутри)</label>
-    <div id="interiorBtns" class="btnrow">
-      <button id="flip180">⟲ 180°</button>
-      <button id="camReset">↺ К капоту</button>
-    </div>
-    <button id="saveBtn">💾 Сохранить фото модели</button>
-    <div class="hint" id="hint">
-      ЛКМ — вращать · ПКМ — панорама<br>
-      Колесо — зум · FPS: <span id="fps">–</span>
-    </div>
-  </div>
+<script>
+const canvas=document.getElementById('renderCanvas');
+const engine=new BABYLON.Engine(canvas,true,{stencil:true});
+const scene=new BABYLON.Scene(engine);
+scene.clearColor=new BABYLON.Color4(0.067,0.071,0.075,1);
 
-  <canvas id="renderCanvas"></canvas>
+const CAR={length:4.354,width:1.733,height:1.517,wheelbase:2.634,clearance:0.155,wheelD:0.621,turnRadius:5.25};
+CAR.wheelR=CAR.wheelD/2;
+CAR.maxSteer=Math.atan(CAR.wheelbase/CAR.turnRadius);
 
-  <script src="https://cdn.babylonjs.com/babylon.js"></script>
-  <script src="https://cdn.babylonjs.com/loaders/babylonjs.loaders.min.js"></script>
-  <script src="https://cdn.babylonjs.com/materialsLibrary/babylonjs.materials.min.js"></script>
-  <script>
-    const canvas = document.getElementById('renderCanvas');
-    const engine = new BABYLON.Engine(canvas, true, { antialias: true });
+const hemi=new BABYLON.HemisphericLight('hemi',new BABYLON.Vector3(0,1,0),scene);hemi.intensity=0.55;
+const dir=new BABYLON.DirectionalLight('dir',new BABYLON.Vector3(-0.5,-1,-0.3),scene);
+dir.position=new BABYLON.Vector3(60,90,40);dir.intensity=0.9;
+const shadowGen=new BABYLON.ShadowGenerator(2048,dir);
+shadowGen.useBlurExponentialShadowMap=true;shadowGen.blurKernel=32;
 
-    const scene = new BABYLON.Scene(engine);
-    scene.clearColor = new BABYLON.Color4(0.10, 0.11, 0.14, 1);
-    scene.environmentIntensity = 0.6;
-    scene.imageProcessingConfiguration.toneMappingEnabled = true;
-    scene.imageProcessingConfiguration.toneMappingType = BABYLON.ImageProcessingConfiguration.TONEMAPPING_ACES;
+const ground=BABYLON.MeshBuilder.CreateGround('ground',{width:100,height:100,subdivisions:2},scene);
+const groundMat=new BABYLON.StandardMaterial('gmat',scene);
+groundMat.diffuseColor=new BABYLON.Color3(0.10,0.10,0.10);groundMat.specularColor=new BABYLON.Color3(0,0,0);
+ground.material=groundMat;ground.receiveShadows=true;
+function gridLines(step,half,y){const lines=[];for(let i=-half;i<=half+1e-6;i+=step){
+  lines.push([new BABYLON.Vector3(i,y,-half),new BABYLON.Vector3(i,y,half)]);
+  lines.push([new BABYLON.Vector3(-half,y,i),new BABYLON.Vector3(half,y,i)]);}return lines;}
+const grid=BABYLON.MeshBuilder.CreateLineSystem('grid',{lines:gridLines(0.5,50,0.01)},scene);
+grid.color=new BABYLON.Color3(0.30,0.30,0.30);grid.isPickable=false;
+const axes=BABYLON.MeshBuilder.CreateLineSystem('axes',{lines:[
+  [new BABYLON.Vector3(0,0.02,-50),new BABYLON.Vector3(0,0.02,50)],
+  [new BABYLON.Vector3(-50,0.02,0),new BABYLON.Vector3(50,0.02,0)]]},scene);
+axes.color=new BABYLON.Color3(0.55,0.55,0.55);axes.isPickable=false;
 
-    const cam = new BABYLON.ArcRotateCamera('cam', -Math.PI / 2, Math.PI / 2.4, 12, new BABYLON.Vector3(0, 0.8, 0), scene);
-    cam.lowerRadiusLimit = 2;
-    cam.upperRadiusLimit = 60;
-    cam.wheelPrecision = 50;
-    cam.attachControl(canvas, true);
-    scene.activeCamera = cam;
+const STEP=0.25,HALF=50;
+const snap=v=>Math.max(-HALF,Math.min(HALF,Math.round(v/STEP)*STEP));
+const key=(x,z)=>`${x.toFixed(2)},${z.toFixed(2)}`;
+const coneNodes=[];const occupied=new Set();const countEl=document.getElementById('count');
+const baseMat=new BABYLON.StandardMaterial('bm',scene);baseMat.diffuseColor=new BABYLON.Color3(0.85,0.26,0.08);baseMat.specularColor=new BABYLON.Color3(0,0,0);
+const coneBodyMat=new BABYLON.StandardMaterial('bdc',scene);coneBodyMat.diffuseColor=new BABYLON.Color3(1,0.43,0);coneBodyMat.specularColor=new BABYLON.Color3(0,0,0);
+const stripeMat=new BABYLON.StandardMaterial('sm',scene);stripeMat.diffuseColor=new BABYLON.Color3(1,1,1);stripeMat.specularColor=new BABYLON.Color3(0,0,0);
+function createCone(){const node=new BABYLON.TransformNode('cone',scene);node.rotationQuaternion=BABYLON.Quaternion.Identity();
+  const base=BABYLON.MeshBuilder.CreateBox('cb',{width:0.25,depth:0.25,height:0.035},scene);
+  base.parent=node;base.position.y=0.0175;base.material=baseMat;base.metadata={isCone:true};
+  const body=BABYLON.MeshBuilder.CreateCylinder('cbd',{diameterTop:0.04,diameterBottom:0.19,height:0.45,tessellation:24},scene);
+  body.parent=node;body.position.y=0.26;body.material=coneBodyMat;body.metadata={isCone:true};
+  const stripe=BABYLON.MeshBuilder.CreateCylinder('cs',{diameterTop:0.10,diameterBottom:0.14,height:0.11,tessellation:24},scene);
+  stripe.parent=node;stripe.position.y=0.255;stripe.material=stripeMat;stripe.metadata={isCone:true};
+  [base,body,stripe].forEach(m=>shadowGen.addShadowCaster(m));
+  coneNodes.push(node);return node;}
+function addConeAt(x,z){const k=key(x,z);if(occupied.has(k))return;occupied.add(k);
+  const n=createCone();n.position.set(x,0,z);n.userData={cellKey:k,knocked:false};updateCount();}
+function deleteCone(n){occupied.delete(n.userData.cellKey);
+  n.getChildMeshes().forEach(m=>shadowGen.removeShadowCaster(m));
+  const i=coneNodes.indexOf(n);if(i>=0)coneNodes.splice(i,1);n.dispose();updateCount();}
+function clearCones(){[...coneNodes].forEach(deleteCone);}
+function updateCount(){countEl.textContent=coneNodes.length;}
 
-    const interiorCam = new BABYLON.UniversalCamera('interiorCam', new BABYLON.Vector3(0, 1.1, 0), scene);
-    interiorCam.minZ = 0.05;
+// ── машина ─────────────────────────────────────────────
+let car=null,steerPivots=[],spinPivots=[],primitiveRoot=null,modelCarRoot=null;
+const modelStatus=document.getElementById('modelStatus');
 
-    const light = new BABYLON.HemisphericLight('hemi', new BABYLON.Vector3(0.3, 1, -0.2), scene);
-    light.intensity = 0.75;
+function createPrimitiveCar(){
+  const root=new BABYLON.TransformNode('car',scene);
+  const paint=new BABYLON.StandardMaterial('paint',scene);paint.diffuseColor=new BABYLON.Color3(0.82,0.84,0.86);paint.specularColor=new BABYLON.Color3(0.5,0.5,0.5);
+  const glass=new BABYLON.StandardMaterial('glass',scene);glass.diffuseColor=new BABYLON.Color3(0.10,0.13,0.17);glass.specularColor=new BABYLON.Color3(0.5,0.5,0.5);
+  const wmat=new BABYLON.StandardMaterial('wmat',scene);wmat.diffuseColor=new BABYLON.Color3(0.10,0.10,0.10);
+  const lf=new BABYLON.StandardMaterial('lf',scene);lf.emissiveColor=new BABYLON.Color3(1,0.95,0.7);
+  const lr=new BABYLON.StandardMaterial('lr',scene);lr.emissiveColor=new BABYLON.Color3(0.9,0.1,0.1);
+  const bodyH=0.60;
+  const body=BABYLON.MeshBuilder.CreateBox('body',{width:CAR.width,height:bodyH,depth:CAR.length},scene);
+  body.parent=root;body.position.y=CAR.clearance+bodyH/2;body.material=paint;
+  const cabinH=CAR.height-(CAR.clearance+bodyH);
+  const cabin=BABYLON.MeshBuilder.CreateBox('cabin',{width:CAR.width*0.86,height:cabinH,depth:CAR.length*0.5},scene);
+  cabin.parent=root;cabin.position.y=(CAR.clearance+bodyH)+cabinH/2;cabin.position.z=-CAR.length*0.02;cabin.material=glass;
+  [-CAR.width*0.32,CAR.width*0.32].forEach((x,i)=>{
+    const hl=BABYLON.MeshBuilder.CreateBox('hl'+i,{width:0.34,height:0.14,depth:0.06},scene);
+    hl.parent=root;hl.position.set(x,CAR.clearance+bodyH*0.6,CAR.length/2+0.01);hl.material=lf;
+    const tl=BABYLON.MeshBuilder.CreateBox('tl'+i,{width:0.30,height:0.16,depth:0.06},scene);
+    tl.parent=root;tl.position.set(x,CAR.clearance+bodyH*0.6,-CAR.length/2-0.01);tl.material=lr;});
+  const frontZ=CAR.wheelbase/2,rearZ=-CAR.wheelbase/2,wx=CAR.width/2-0.095;
+  const spinNodes=[],frontSteers=[];
+  [{x:wx,z:frontZ,f:1},{x:-wx,z:frontZ,f:1},{x:wx,z:rearZ,f:0},{x:-wx,z:rearZ,f:0}].forEach((wd,i)=>{
+    const pos=new BABYLON.Vector3(wd.x,CAR.wheelR,wd.z);let parent=root;
+    if(wd.f){const s=new BABYLON.TransformNode('steer'+i,scene);s.parent=root;s.position.copyFrom(pos);frontSteers.push(s);parent=s;}
+    const sp=new BABYLON.TransformNode('spin'+i,scene);sp.parent=parent;if(!wd.f)sp.position.copyFrom(pos);
+    const w=BABYLON.MeshBuilder.CreateCylinder('w'+i,{diameter:CAR.wheelD,height:0.19,tessellation:24},scene);
+    w.parent=sp;w.rotation.z=Math.PI/2;w.material=wmat;shadowGen.addShadowCaster(w);spinNodes.push(sp);});
+  [body,cabin].forEach(m=>shadowGen.addShadowCaster(m));
+  return{root,spinNodes,frontSteers};
+}
+function usePrimitiveCar(){const o=createPrimitiveCar();car=o.root;primitiveRoot=o.root;
+  steerPivots=o.frontSteers;spinPivots=o.spinNodes.map(n=>({node:n,radius:CAR.wheelR}));
+  modelStatus.textContent='Модель: заглушка — нажми «Выбрать модель с диска»';}
+function disposeCurrentCar(){
+  if(primitiveRoot){primitiveRoot.getChildMeshes().forEach(m=>shadowGen.removeShadowCaster(m));primitiveRoot.dispose();primitiveRoot=null;}
+  if(modelCarRoot){modelCarRoot.getChildMeshes().forEach(m=>shadowGen.removeShadowCaster(m));modelCarRoot.dispose();modelCarRoot=null;}
+  steerPivots=[];spinPivots=[];
+}
+function aggregateBB(node){
+  const min=new BABYLON.Vector3(Infinity,Infinity,Infinity),max=new BABYLON.Vector3(-Infinity,-Infinity,-Infinity);
+  node.getChildMeshes().forEach(m=>{m.computeWorldMatrix(true);
+    const b=m.getBoundingInfo().boundingBox;min.minimizeInPlace(b.minimumWorld);max.maximizeInPlace(b.maximumWorld);});
+  return{min,max,size:max.subtract(min),center:min.add(max).scale(0.5)};
+}
 
-    const shadowLight = new BABYLON.DirectionalLight('dir', new BABYLON.Vector3(-1, -1.6, 0.4), scene);
-    shadowLight.intensity = 1.1;
+// применить загруженный файл как машину
+function adoptLoadedModel(newMeshes,label,flip){
+  const modelRoot=newMeshes.find(m=>!m.parent)||newMeshes[0];
+  const carRoot=new BABYLON.TransformNode('carRoot',scene);
+  modelRoot.setParent(carRoot,true);
+  let bb=aggregateBB(modelRoot);
+  if(bb.size.x>bb.size.z)modelRoot.rotation.y+=Math.PI/2;
+  if(flip)modelRoot.rotation.y+=Math.PI;
+  modelRoot.computeWorldMatrix(true);bb=aggregateBB(modelRoot);
+  const s=CAR.length/Math.max(bb.size.x,bb.size.z);
+  modelRoot.scaling.setAll(s);
+  modelRoot.computeWorldMatrix(true);bb=aggregateBB(modelRoot);
+  modelRoot.position.x-=bb.center.x;modelRoot.position.z-=bb.center.z;modelRoot.position.y-=bb.min.y;
+  modelRoot.computeWorldMatrix(true);
+  const steer=[],spin=[];
+  const parts=modelRoot.getChildMeshes();
+  parts.forEach(m=>{shadowGen.addShadowCaster(m);m.isPickable=false;});
+  const wheelMeshes=parts.filter(m=>/wheel|tire|tyre|roue/i.test(m.name));
+  wheelMeshes.forEach(wm=>{try{
+    wm.computeWorldMatrix(true);
+    const b=wm.getBoundingInfo().boundingBox,c=b.centerWorld,r=(b.maximumWorld.y-b.minimumWorld.y)/2;
+    let pivotParent=carRoot,off=c;
+    if(c.z>0){const st=new BABYLON.TransformNode('steer',scene);st.parent=carRoot;st.position.set(c.x,0,c.z);
+      steer.push(st);pivotParent=st;off=new BABYLON.Vector3(0,c.y,0);}
+    const sp=new BABYLON.TransformNode('spin',scene);sp.parent=pivotParent;sp.position.copyFrom(off);
+    wm.setParent(sp,true);spin.push({node:sp,radius:r||CAR.wheelR});
+  }catch(e){}});
+  disposeCurrentCar();
+  modelCarRoot=carRoot;car=carRoot;steerPivots=steer;spinPivots=spin;
+  car.position.set(0,0,0);
+  modelStatus.textContent=`Модель: ${label}`+(spin.length?` · колёс: ${spin.length}`:' · колёса не найдены');
+}
 
-    const ground = new BABYLON.GridMaterial('grid', scene);
-    ground.gridRatio = 1;
-    ground.mainColor = new BABYLON.Color3(0.05, 0.05, 0.05);
-    ground.lineColor = new BABYLON.Color3(0.35, 0.38, 0.45);
-    ground.opacity = 0.9;
-    const groundMesh = BABYLON.MeshBuilder.CreateGround('ground', { width: 30, height: 30 }, scene);
-    groundMesh.material = ground;
-    groundMesh.position.y = 0;
+// выбор файла с диска
+const modelFile=document.getElementById('modelFile');
+document.getElementById('pickModel').addEventListener('click',()=>modelFile.click());
+modelFile.addEventListener('change',async e=>{
+  const file=e.target.files[0];if(!file)return;
+  const nameLow=file.name.toLowerCase();
+  const isGLTF=nameLow.endsWith('.gltf');
+  const isGLB=nameLow.endsWith('.glb');
+  if(!isGLTF && !isGLB){
+    modelStatus.textContent='Нужен файл .glb или .gltf';
+    modelFile.value=''; return;
+  }
+  // если имя заканчивается на _flip.glb — развернём модель на 180°
+  const flip=/_flip\.(glb|gltf)$/i.test(file.name);
+  const url=URL.createObjectURL(file);
+  modelStatus.textContent='Загрузка: '+file.name+'…';
+  try{
+    const before=new Set(scene.meshes);
+    await BABYLON.SceneLoader.AppendAsync('',url,scene,null,isGLTF?'.gltf':'.glb');
+    const nm=scene.meshes.filter(m=>!before.has(m));
+    if(nm.length)adoptLoadedModel(nm,file.name,flip);
+    else modelStatus.textContent='Не удалось прочитать: '+file.name;
+  }catch(err){
+    modelStatus.textContent='Ошибка: '+file.name;
+    console.warn(err);
+  }finally{
+    setTimeout(()=>URL.revokeObjectURL(url),10000);
+    modelFile.value='';
+  }
+});
 
-    let model = null;
-    let loadedMeshes = [];
-    let loadedNodes = [];
-    let carBounds = null;
-    const modelSelect = document.getElementById('modelSelect');
-    const loading = document.getElementById('loading');
-    const interiorEl = document.getElementById('interior');
-    const interiorBtns = document.getElementById('interiorBtns');
-    let interiorActive = false;
-    let forward = new BABYLON.Vector3(0, 0, -1);
-    let lastYaw = 0;
-    let carCenter = new BABYLON.Vector3(0, 0, 0);
+usePrimitiveCar();
 
-    function getCarBounds(resultMeshes) {
-      let mn = null, mx = null;
-      resultMeshes.forEach(m => {
-        m.computeWorldMatrix(true, false);
-        const b = m.getBoundingInfo().boundingBox;
-        const mnw = b.minimumWorld, mxw = b.maximumWorld;
-        const d = BABYLON.Vector3.Distance(mnw, mxw);
-        if (d <= 0.001) return;
-        if (!mn) { mn = mnw.clone(); mx = mxw.clone(); return; }
-        mn.minimizeInPlace(mnw);
-        mx.maximizeInPlace(mxw);
-      });
-      return mn && mx ? { min: mn, max: mx } : null;
-    }
+const camera=new BABYLON.ArcRotateCamera('cam',-Math.PI/2,1.15,11,new BABYLON.Vector3(0,0,0),scene);
+camera.attachControl(canvas,true);
+camera.lowerRadiusLimit=5;camera.upperRadiusLimit=220;camera.upperBetaLimit=Math.PI/2-0.02;
+camera.panningSensibility=0;camera.wheelDeltaPercentage=0.01;camera.minZ=0.1;camera.maxZ=1500;
 
-    function setupCamera(file) {
-      carBounds = getCarBounds(loadedMeshes);
-      const bounds = carBounds || { min: new BABYLON.Vector3(-1, 0, -2), max: new BABYLON.Vector3(1, 1.4, 2) };
-      const size = BABYLON.Vector3.Distance(bounds.max, bounds.min);
-      carCenter = bounds.max.add(bounds.min).scale(0.5);
+const preview=BABYLON.MeshBuilder.CreateTorus('preview',{diameter:0.4,thickness:0.04,tessellation:28},scene);
+const prevMat=new BABYLON.StandardMaterial('pm',scene);
+prevMat.diffuseColor=new BABYLON.Color3(1,0.43,0);prevMat.emissiveColor=new BABYLON.Color3(1,0.43,0);
+prevMat.alpha=0.85;prevMat.specularColor=new BABYLON.Color3(0,0,0);
+preview.material=prevMat;preview.position.y=0.05;preview.isVisible=false;preview.isPickable=false;
 
-      cam.target = carCenter;
-      cam.radius = size * 1.4;
-      cam.setTarget(carCenter);
-      cam.alpha = -Math.PI / 2;
-      cam.beta = Math.PI / 2.4;
+let mode='place',dragging=null,dragOldKey=null;
+const hintline=document.getElementById('hintline');
+const HINTS={place:'Клик по площадке — поставить конус (шаг 0,25 м)',
+  move:'Зажми конус и перетащи в новый узел',delete:'Клик по конусу — удалить его'};
+const CURSORS={place:'crosshair',move:'grab',delete:'pointer'};
+function setMode(m){mode=m;
+  document.querySelectorAll('.modes button').forEach(b=>b.classList.toggle('active',b.dataset.mode===m));
+  hintline.textContent=HINTS[m];canvas.style.cursor=CURSORS[m];preview.isVisible=false;}
+document.querySelectorAll('.modes button').forEach(b=>b.addEventListener('click',()=>setMode(b.dataset.mode)));
+document.getElementById('clear').addEventListener('click',clearCones);
 
-      ground.position.x = carCenter.x;
-      ground.position.z = carCenter.z;
-      ground.position.y = bounds.min.y;
+const keys={forward:false,back:false,left:false,right:false,brake:false};
+const keyMap={KeyW:'forward',ArrowUp:'forward',KeyS:'back',ArrowDown:'back',
+  KeyA:'left',ArrowLeft:'left',KeyD:'right',ArrowRight:'right',Space:'brake'};
+addEventListener('keydown',e=>{const a=keyMap[e.code];
+  if(a!==undefined){keys[a]=true;if(e.code.startsWith('Arrow')||e.code==='Space')e.preventDefault();}
+  if(e.code==='Digit1')setMode('place');else if(e.code==='Digit2')setMode('move');
+  else if(e.code==='Digit3')setMode('delete');else if(e.code==='KeyC')clearCones();});
+addEventListener('keyup',e=>{const a=keyMap[e.code];if(a!==undefined)keys[a]=false;});
 
-      const dims = bounds.max.subtract(bounds.min);
-      forward = dims.z >= dims.x ? new BABYLON.Vector3(0, 0, -1) : new BABYLON.Vector3(-1, 0, 0);
-      updateInteriorPlacement();
+let speed=0,heading=0,steerAngle=0;
+const spdEl=document.getElementById('spd'),strEl=document.getElementById('str');
+function updateCar(dt){
+  let throttle=0,steerInput=0;
+  if(keys.forward)throttle+=1;if(keys.back)throttle-=1;
+  if(keys.left)steerInput-=1;if(keys.right)steerInput+=1;
+  if(throttle>0)speed+=12*dt;else if(throttle<0)speed-=12*dt;
+  else{if(speed>0)speed=Math.max(0,speed-7*dt);else speed=Math.min(0,speed+7*dt);}
+  if(keys.brake){if(speed>0)speed=Math.max(0,speed-25*dt);else speed=Math.min(0,speed+25*dt);}
+  speed=Math.max(-6,Math.min(14,speed));
+  const target=steerInput*CAR.maxSteer,rate=1.6;
+  if(steerAngle<target)steerAngle=Math.min(target,steerAngle+rate*dt);
+  else if(steerAngle>target)steerAngle=Math.max(target,steerAngle-rate*dt);
+  heading+=(speed/CAR.wheelbase)*Math.tan(steerAngle)*dt;
+  car.rotation.y=heading;
+  const fwd=new BABYLON.Vector3(Math.sin(heading),0,Math.cos(heading));
+  car.position.addInPlace(fwd.scale(speed*dt));
+  car.position.x=Math.max(-48,Math.min(48,car.position.x));
+  car.position.z=Math.max(-48,Math.min(48,car.position.z));
+  const roll=speed*dt;
+  spinPivots.forEach(sp=>sp.node.rotation.x+=roll/sp.radius);
+  steerPivots.forEach(s=>s.rotation.y=steerAngle);
+  spdEl.textContent=Math.round(Math.abs(speed)*3.6);
+  const deg=Math.round(steerAngle*180/Math.PI);
+  strEl.textContent=(deg<0?'← ':deg>0?'→ ':'')+Math.abs(deg)+'°';
+}
+function lerpAngle(a,b,t){let d=(b-a)%(Math.PI*2);if(d>Math.PI)d-=Math.PI*2;if(d<-Math.PI)d+=Math.PI*2;return a+d*t;}
+function updateCamera(){const t=camera.target;
+  t.x+=(car.position.x-t.x)*0.12;t.y+=((car.position.y+1.2)-t.y)*0.12;t.z+=(car.position.z-t.z)*0.12;
+  if(Math.abs(speed)>0.5){const desired=Math.atan2(-Math.cos(heading),-Math.sin(heading));
+    camera.alpha=lerpAngle(camera.alpha,desired,0.06);}}
 
-      const names = {
-        'Sedan.glb': 'Toyota Mark X', 'VolvoS60R.glb': 'Volvo S60 R',
-        'Logan2_2017.glb': 'Логан 2', 'BMW_M3_GTR.glb': 'BMW M3 GTR',
-        'BMW_M3_Coupe.glb': 'BMW M3 (E46)', 'BMW_Vision.glb': 'BMW Vision Neue Klasse',
-        'BYD_U9.glb': 'BYD Yangwang U9', 'Mazda3.glb': 'Mazda 3 (2011)',
-        'AudiS4.glb': 'Audi S4'
-      };
-      document.querySelector('#ui h1').textContent = 'Просмотр 3D модели — ' + (names[file] || file);
-    }
+function distPointSegment(px,pz,ax,az,bx,bz){
+  const abx=bx-ax,abz=bz-az,apx=px-ax,apz=pz-az;
+  const len2=abx*abx+abz*abz;let t=len2?(apx*abx+apz*abz)/len2:0;t=Math.max(0,Math.min(1,t));
+  return Math.hypot(px-(ax+abx*t),pz-(az+abz*t));}
+function carHits(px,pz){
+  const fwd=new BABYLON.Vector3(Math.sin(heading),0,Math.cos(heading));
+  const half=CAR.wheelbase/2+0.86;
+  const fx=car.position.x+fwd.x*half,fz=car.position.z+fwd.z*half;
+  const rx=car.position.x-fwd.x*half,rz=car.position.z-fwd.z*half;
+  return distPointSegment(px,pz,rx,rz,fx,fz)<(CAR.width/2+0.15);}
+function knockCone(node,carPos){node.userData.knocked=true;
+  const d=node.position.subtract(carPos);d.y=0;
+  if(d.lengthSquared()<1e-6)d.set(0,0,1);d.normalize();
+  node.position.addInPlace(d.scale(0.35));
+  const axis=BABYLON.Vector3.Cross(BABYLON.Vector3.Up(),d).normalize();
+  node.rotationQuaternion=BABYLON.Quaternion.RotationAxis(axis,Math.PI/2*0.95);}
+function checkCollisions(){for(const node of coneNodes){const ud=node.userData;
+  if(!ud||ud.knocked||node===dragging)continue;
+  if(carHits(node.position.x,node.position.z))knockCone(node,car.position);}}
 
-    function updateInteriorPlacement() {
-      if (!carBounds) return;
-      const mn = carBounds.min, mx = carBounds.max;
-      const dims = mx.subtract(mn);
-      const center = mx.add(mn).scale(0.5);
-      const eye = new BABYLON.Vector3(center.x, mn.y + dims.y * 0.62, center.z);
-      interiorCam.position = eye;
-      if (cameraAxis === 'z') {
-        interiorCam.rotation = new BABYLON.Vector3(0, forward.z >= 0 ? Math.PI : 0, 0);
-      } else {
-        interiorCam.rotation = new BABYLON.Vector3(0, forward.x >= 0 ? -Math.PI / 2 : Math.PI / 2, 0);
-      }
-      lastYaw = interiorCam.rotation.y;
-    }
+const pickGround=()=>scene.pick(scene.pointerX,scene.pointerY,m=>m.name==='ground');
+const pickCone=()=>scene.pick(scene.pointerX,scene.pointerY,m=>m.metadata&&m.metadata.isCone);
+scene.onPointerObservable.add(pi=>{const t=pi.type;
+  if(t===BABYLON.PointerEventTypes.POINTERMOVE){
+    const p=pickGround();
+    if(p.hit){const sx=snap(p.pickedPoint.x),sz=snap(p.pickedPoint.z);
+      preview.position.set(sx,0.05,sz);preview.isVisible=(mode==='place')||!!dragging;
+      if(dragging)dragging.position.set(sx,0,sz);}
+    else if(!dragging)preview.isVisible=false;}
+  else if(t===BABYLON.PointerEventTypes.POINTERDOWN){
+    if(mode==='move'){const c=pickCone();
+      if(c.hit){dragging=c.pickedMesh.parent;const ud=dragging.userData;
+        dragging.rotationQuaternion=BABYLON.Quaternion.Identity();ud.knocked=false;
+        dragOldKey=ud.cellKey;occupied.delete(dragOldKey);
+        camera.detachControl();canvas.style.cursor='grabbing';}}}
+  else if(t===BABYLON.PointerEventTypes.POINTERUP){
+    if(dragging){const x=snap(dragging.position.x),z=snap(dragging.position.z),k=key(x,z);
+      const ud=dragging.userData;
+      if(occupied.has(k)){const[ox,oz]=dragOldKey.split(',').map(Number);
+        dragging.position.set(ox,0,oz);occupied.add(dragOldKey);ud.cellKey=dragOldKey;}
+      else{dragging.position.set(x,0,z);occupied.add(k);ud.cellKey=k;}
+      dragging=null;camera.attachControl(canvas,true);canvas.style.cursor=CURSORS[mode];}}
+  else if(t===BABYLON.PointerEventTypes.POINTERTAP){
+    if(dragging)return;
+    if(mode==='delete'){const c=pickCone();if(c.hit)deleteCone(c.pickedMesh.parent);}
+    else if(mode==='place'){const p=pickGround();if(p.hit)addConeAt(snap(p.pickedPoint.x),snap(p.pickedPoint.z));}}});
 
-    let cameraAxis = 'z';
+scene.onBeforeRenderObservable.add(()=>{const dt=Math.min(engine.getDeltaTime()/1000,0.05);
+  updateCar(dt);updateCamera();checkCollisions();});
+engine.runRenderLoop(()=>scene.render());
+addEventListener('resize',()=>engine.resize());
+setMode('place');
+</script>
 
-    function loadModel(file) {
-      setInterior(false);
-      if (model) { model.dispose(); model = null; }
-      loadedMeshes.forEach(m => m.dispose());
-      loadedMeshes = [];
-      loading.classList.remove('hidden');
-
-      BABYLON.SceneLoader.ImportMeshAsync('', './', file, scene)
-        .then(result => {
-          model = result.meshes[0];
-          loadedMeshes = result.meshes;
-          loadedNodes = result.transformNodes;
-          normalizeScale();
-          loading.classList.add('hidden');
-          cameraAxis = 'z';
-          setupCamera(file);
-        })
-        .catch(err => {
-          loading.innerHTML =
-            '<div>Не удалось загрузить модель: ' + (err && err.message ? err.message : err) + '</div>';
-        });
-    }
-
-    function normalizeScale() {
-      const b = getCarBounds(loadedMeshes);
-      if (!b) return;
-      const dims = b.max.subtract(b.min);
-      const len = Math.max(Math.abs(dims.x), Math.abs(dims.z));
-      if (len >= 1 && len <= 15) return;
-      const factor = 4.5 / len;
-      const all = loadedMeshes.concat(loadedNodes);
-      const roots = [];
-      all.forEach(m => {
-        const p = m.parent;
-        if (p === scene || p === null || !all.includes(p)) roots.push(m);
-      });
-      roots.forEach(m => (m.scaling = m.scaling.scale(factor)));
-      loadedMeshes.forEach(m => m.computeWorldMatrix(true, false));
-      carBounds = getCarBounds(loadedMeshes);
-    }
-
-    modelSelect.addEventListener('change', e => loadModel(e.target.value));
-    loadModel('Sedan.glb');
-
-    document.getElementById('wireframe').addEventListener('change', e => {
-      if (!model) return;
-      model.getChildMeshes(true).forEach(m => {
-        if (m.material) m.material.wireframe = e.target.checked;
-      });
-    });
-
-    document.getElementById('grid').addEventListener('change', e => {
-      groundMesh.isVisible = e.target.checked;
-      light.intensity = e.target.checked ? 0.75 : 0.3;
-      shadowLight.intensity = e.target.checked ? 1.1 : 0.6;
-    });
-
-    const autoRot = document.getElementById('auto');
-    setInterval(() => { autoRot.checked && !interiorActive ? cam.alpha += 0.0025 : 0; }, 16);
-
-    // --- interior (салон) ---
-    let dragging = false, lastX = 0, lastY = 0;
-    const keys = {};
-
-    function setInterior(on) {
-      interiorActive = on;
-      if (on) {
-        cam.detachControl();
-        scene.activeCamera = interiorCam;
-        updateInteriorPlacement();
-      } else {
-        cam.attachControl(canvas, true);
-        scene.activeCamera = cam;
-        cam.setTarget(carCenter);
-      }
-      canvas.style.cursor = on ? 'crosshair' : 'default';
-      document.getElementById('hint').innerHTML = on
-        ? 'Мышь — осмотр (drag) · Колесо — вперёд/назад<br>WASD — движение · PgUp/PgDn — вниз/вверх'
-        : 'ЛКМ — вращать · ПКМ — панорама<br>Колесо — зум · FPS: <span id="fps">' + Math.round(engine.getFps()) + '</span>';
-    }
-
-    interiorEl.addEventListener('change', e => setInterior(e.target.checked));
-
-    interiorBtns.style.display = 'block';
-    document.getElementById('flip180').addEventListener('click', () => {
-      if (!interiorActive) return;
-      interiorCam.rotation.y += Math.PI;
-      lastYaw = interiorCam.rotation.y;
-    });
-    document.getElementById('camReset').addEventListener('click', () => {
-      if (!interiorActive) return;
-      interiorCam.rotation = new BABYLON.Vector3(interiorCam.rotation.x, lastYaw, 0);
-      interiorCam.position.y = carBounds ? carBounds.min.y + (carBounds.max.y - carBounds.min.y) * 0.62 : 1.1;
-    });
-
-    canvas.addEventListener('pointerdown', e => {
-      if (!interiorActive) return;
-      dragging = true; lastX = e.clientX; lastY = e.clientY;
-    });
-    window.addEventListener('pointermove', e => {
-      if (!interiorActive || !dragging) return;
-      const dx = e.clientX - lastX, dy = e.clientY - lastY;
-      lastX = e.clientX; lastY = e.clientY;
-      interiorCam.rotation.y -= dx * 0.004;
-      interiorCam.rotation.x -= dy * 0.004;
-      interiorCam.rotation.x = Math.max(-1.4, Math.min(1.4, interiorCam.rotation.x));
-    });
-    window.addEventListener('pointerup', () => dragging = false);
-
-    canvas.addEventListener('wheel', e => {
-      if (!interiorActive) return;
-      e.preventDefault();
-      const dir = interiorCam.getDirection(new BABYLON.Vector3(0, 0, e.deltaY > 0 ? 1 : -1));
-      interiorCam.position.addInPlace(dir.scale(0.15));
-    }, { passive: false });
-
-    window.addEventListener('keydown', e => keys[e.code] = true);
-    window.addEventListener('keyup', e => keys[e.code] = false);
-    const moveVec = new BABYLON.Vector3(0, 0, 0);
-    engine.runRenderLoop(() => {
-      if (interiorActive) {
-        moveVec.copyFromFloats(0, 0, 0);
-        if (keys['KeyW']) moveVec.z += 1;
-        if (keys['KeyS']) moveVec.z -= 1;
-        if (keys['KeyA']) moveVec.x -= 1;
-        if (keys['KeyD']) moveVec.x += 1;
-        if (moveVec.lengthSquared() > 0) {
-          moveVec.normalize().scaleInPlace(0.12);
-          interiorCam.getViewMatrix();
-          const fwd = interiorCam.getDirection(new BABYLON.Vector3(0, 0, 1));
-          const right = interiorCam.getDirection(new BABYLON.Vector3(1, 0, 0));
-          interiorCam.position.addInPlace(fwd.scale(-moveVec.z).add(right.scale(moveVec.x)));
-        }
-        if (keys['PageUp']) interiorCam.position.y += 0.1;
-        if (keys['PageDown']) interiorCam.position.y -= 0.1;
-      }
-      scene.render();
-      document.getElementById('fps').textContent = Math.round(engine.getFps());
-    });
-
-    document.getElementById('saveBtn').addEventListener('click', () => {
-      BABYLON.Tools.CreateScreenshot(engine, scene.activeCamera, { precision: 1 }, data => {
-        const a = document.createElement('a');
-        a.href = data;
-        a.download = 'car.png';
-        a.click();
-      });
-    });
-
-    window.addEventListener('resize', () => engine.resize());
-  </script>
 </body>
 </html>
