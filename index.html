@@ -1307,7 +1307,13 @@ scene.onBeforeRenderObservable.add(()=>{
   updateCamera();
   checkCollisions();
 });
-engine.runRenderLoop(()=>scene.render());
+let __lastFrame=0;
+engine.runRenderLoop(()=>{
+  const now=performance.now();
+  if(now-__lastFrame<16.6)return;
+  __lastFrame=now;
+  scene.render();
+});
 addEventListener('resize',()=>engine.resize());
 setMode('place');
 
