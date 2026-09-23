@@ -42,6 +42,7 @@
   <div class="title">Площадка 100×100 · авто + конусы</div>
   <div class="spec">масштаб под Logan: 4354×1733×1517 · база 2634 · клиренс 155</div>
   <div id="modelStatus">Модель: заглушка</div>
+  <select id="autoModel" style="width:100%;padding:6px 4px;margin-bottom:8px;background:#1c2c3a;color:#9db4c4;border:1px solid #2a4257;border-radius:2px;font:600 11px/1 inherit"></select>
   <button class="filebtn" id="pickModel">Выбрать модель с диска (.glb)…</button>
   <input type="file" id="modelFile" accept=".glb,.gltf" style="display:none">
   <div class="modes">
@@ -191,6 +192,53 @@ function adoptLoadedModel(newMeshes,label,flip){
   modelStatus.textContent=`Модель: ${label}`+(spin.length?` · колёс: ${spin.length}`:' · колёса не найдены');
 }
 
+// загрузка модели по url / метке
+async function loadModelByName(name){
+  const isGLTF=/\.gltf$/i.test(name);
+  const isGLB=/\.glb$/i.test(name);
+  const flip=/_flip\.(glb|gltf)$/i.test(name);
+  modelStatus.textContent='Загрузка: '+name+'…';
+  try{
+    const before=new Set(scene.meshes);
+    await BABYLON.SceneLoader.AppendAsync('',name,scene,null,isGLTF?'.gltf':'.glb');
+    const nm=scene.meshes.filter(m=>!before.has(m));
+    if(nm.length)adoptLoadedModel(nm,name,flip);
+    else modelStatus.textContent='Не удалось прочитать: '+name;
+  }catch(err){
+    modelStatus.textContent='Ошибка: '+name;
+    console.warn(err);
+  }
+}
+
+// модели из папки auto — константы с полными названиями и путями
+const CAR_MODELS={
+  'Audi S4':'auto/AudiS4.glb',
+  'BMW M3 Coupe':'auto/BMW_M3_Coupe.glb',
+  'BMW M3 GTR':'auto/BMW_M3_GTR.glb',
+  'BMW Vision':'auto/BMW_Vision.glb',
+  'BYD U9':'auto/BYD_U9.glb',
+  'Logan 2 2017':'auto/Logan2_2017.glb',
+  'Mazda 3':'auto/Mazda3.glb',
+  'Sedan':'auto/Sedan.glb',
+  'Volvo S60R':'auto/VolvoS60R.glb',
+};
+const autoModel=document.getElementById('autoModel');
+function fillAutoModel(){
+  autoModel.textContent='';
+  const stub=document.createElement('option');
+  stub.textContent='— заглушка —';stub.value='';autoModel.appendChild(stub);
+  for(const[name,path]of Object.entries(CAR_MODELS)){
+    const o=document.createElement('option');
+    o.textContent=name;o.value=path;autoModel.appendChild(o);
+  }
+}
+fillAutoModel();
+autoModel.addEventListener('change',()=>{
+  const v=autoModel.value;
+  if(!v)usePrimitiveCar();
+  else loadModelByName(v);
+});
+
 // выбор файла с диска
 const modelFile=document.getElementById('modelFile');
 document.getElementById('pickModel').addEventListener('click',()=>modelFile.click());
@@ -203,7 +251,6 @@ modelFile.addEventListener('change',async e=>{
     modelStatus.textContent='Нужен файл .glb или .gltf';
     modelFile.value=''; return;
   }
-  // если имя заканчивается на _flip.glb — развернём модель на 180°
   const flip=/_flip\.(glb|gltf)$/i.test(file.name);
   const url=URL.createObjectURL(file);
   modelStatus.textContent='Загрузка: '+file.name+'…';
