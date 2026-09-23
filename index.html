@@ -129,11 +129,11 @@ const engine=new BABYLON.Engine(canvas,true,{stencil:true});
 const scene=new BABYLON.Scene(engine);
 const isMobile=/Android|iPhone|iPad|iPod/i.test(navigator.userAgent)||(navigator.maxTouchPoints>1&&Math.max(screen.width,screen.height)<1100);
 if(isMobile)engine.setHardwareScalingLevel(0.6);
-const MIRROR_SIZE=isMobile?512:1024;
+const MIRROR_SIZE=1024;
 scene.clearColor=new BABYLON.Color4(0.067,0.071,0.075,1);
 
 // ── Повышение резкости и чёткости изображения ─────────────────────
-scene.imageProcessingConfiguration.sharpenEnabled = !isMobile;
+scene.imageProcessingConfiguration.sharpenEnabled = true;
 scene.imageProcessingConfiguration.sharpenEdgeStrength = 0.6;
 scene.imageProcessingConfiguration.sharpenColorStrength = 0.4;
 scene.imageProcessingConfiguration.contrast = 1.1;
