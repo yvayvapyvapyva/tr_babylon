@@ -381,8 +381,7 @@ function setupCarExtras(modelRoot){
     if(wn.rotationQuaternion)pivot.rotationQuaternion=wn.rotationQuaternion.clone();
     else pivot.rotationQuaternion=BABYLON.Quaternion.FromEulerAngles(wn.rotation.x,wn.rotation.y,wn.rotation.z);
     const Vtx=[],Idx=[];
-    const rimWheels=wheels.filter(m=>/stitches|leather/i.test(m.name));
-    const hubMs=rimWheels.length?rimWheels:wheels;
+    const hubMs=wheels;
     hubMs.forEach(m=>{
       const geo=m.geometry;if(!geo)return;
       const pos=geo.getVerticesData(BABYLON.VertexBuffer.PositionKind);
@@ -397,6 +396,7 @@ function setupCarExtras(modelRoot){
     const V=BABYLON.Vector3;
     const hub=new BABYLON.Vector3(0,0,0);
     Vtx.forEach(v=>hub.addInPlace(v));hub.scaleInPlace(1/Vtx.length);
+    hub.y+=0.02;
     let nrm=new BABYLON.Vector3(0,0,0),kc=0;
     for(let i=0;i+2<Idx.length;i+=3){
       const a=Vtx[Idx[i]],b=Vtx[Idx[i+1]],c3=Vtx[Idx[i+2]];
