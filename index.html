@@ -70,6 +70,8 @@
     border-radius:50%;cursor:pointer;user-select:none;-webkit-user-select:none;
     -webkit-tap-highlight-color:transparent;display:flex;align-items:center;justify-content:center;touch-action:none}
   .dv-blink.active{background:#ffd60a;color:#1a1200;border-color:#ffd60a}
+  #driveCtrl,#driveCtrl *{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
+  #ui button,#ui .collapse-btn{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
   .dv-wheelwrap{position:relative;width:min(30vw,500px,calc(50vh - 30px));display:flex;flex-direction:column;
     align-items:flex-end;justify-content:flex-end;pointer-events:none;box-sizing:border-box;padding:0}
   .dv-wheel{position:relative;border-radius:50%;pointer-events:auto;touch-action:none;cursor:grab;
@@ -984,6 +986,14 @@ function syncBlinkBtns(){
 }
 if(blkL)blkL.addEventListener('click',()=>{blinkerLeft=!blinkerLeft;if(blinkerLeft)blinkerRight=false;syncBlinkBtns();});
 if(blkR)blkR.addEventListener('click',()=>{blinkerRight=!blinkerRight;if(blinkerRight)blinkerLeft=false;syncBlinkBtns();});
+document.addEventListener('contextmenu',e=>{
+  const t=e.target;
+  if(t&&t.closest&&(t.closest('#driveCtrl')||(t.closest('#ui')&&t.closest('button,.collapse-btn'))))e.preventDefault();
+});
+document.addEventListener('selectstart',e=>{
+  const t=e.target;
+  if(t&&t.closest&&t.closest('#driveCtrl'))e.preventDefault();
+});
 canvas.addEventListener('pointerdown',e=>{
   if(pickMode){
     const r=canvas.getBoundingClientRect();
