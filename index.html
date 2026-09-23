@@ -40,7 +40,7 @@
 
 <div id="ui">
   <div class="title">Площадка 100×100 · авто + конусы</div>
-  <div class="spec">масштаб под Logan: 4354×1733×1517 · база 2634 · клиренс 155</div>
+  <div class="spec">масштаб под Logan: 4346×1733×1517 · база 2634 · свесы 818/894 · клиренс 155</div>
   <div id="modelStatus">Модель: заглушка</div>
   <select id="autoModel" style="width:100%;padding:6px 4px;margin-bottom:8px;background:#1c2c3a;color:#9db4c4;border:1px solid #2a4257;border-radius:2px;font:600 11px/1 inherit"></select>
   <button class="filebtn" id="pickModel">Выбрать модель с диска (.glb)…</button>
@@ -63,7 +63,7 @@ const engine=new BABYLON.Engine(canvas,true,{stencil:true});
 const scene=new BABYLON.Scene(engine);
 scene.clearColor=new BABYLON.Color4(0.067,0.071,0.075,1);
 
-const CAR={length:4.354,width:1.733,height:1.517,wheelbase:2.634,clearance:0.155,wheelD:0.621};
+const CAR={length:4.346,width:1.733,height:1.517,wheelbase:2.634,clearance:0.155,wheelD:0.621,frontOverhang:0.818,rearOverhang:0.894};
 CAR.turnDiameter=10.5;
 CAR.turnRadius=(CAR.turnDiameter-CAR.width)/2;
 CAR.wheelR=CAR.wheelD/2;
@@ -135,7 +135,7 @@ function createPrimitiveCar(){
     hl.parent=root;hl.position.set(x,CAR.clearance+bodyH*0.6,CAR.length/2+0.01);hl.material=lf;
     const tl=BABYLON.MeshBuilder.CreateBox('tl'+i,{width:0.30,height:0.16,depth:0.06},scene);
     tl.parent=root;tl.position.set(x,CAR.clearance+bodyH*0.6,-CAR.length/2-0.01);tl.material=lr;});
-  const frontZ=CAR.wheelbase/2,rearZ=-CAR.wheelbase/2,wx=CAR.width/2-0.095;
+  const frontZ=CAR.length/2-CAR.frontOverhang,rearZ=-(CAR.length/2-CAR.rearOverhang),wx=CAR.width/2-0.095;
   const spinNodes=[],frontSteers=[];
   [{x:wx,z:frontZ,f:1},{x:-wx,z:frontZ,f:1},{x:wx,z:rearZ,f:0},{x:-wx,z:rearZ,f:0}].forEach((wd,i)=>{
     const pos=new BABYLON.Vector3(wd.x,CAR.wheelR,wd.z);let parent=root;
