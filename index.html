@@ -65,6 +65,16 @@
   <div class="tele" id="blinkdbg">Q/E: поворотники (инициализация…)</div>
   <button id="clear">Очистить конусы (C)</button>
   <button id="cabBtn">Обзор: кабина (V)</button>
+
+  <div class="mirror-ctrl">
+    <div class="mirror-title">👁 Угол обзора из кабины</div>
+    <div class="mirror-row">
+      <label>FOV</label>
+      <input type="range" id="cabFov" min="40" max="120" value="77" step="1">
+      <span class="val" id="cabFovV">77°</span>
+    </div>
+    <div class="mirror-keys">Ширина поля зрения водителя (горизонтальный угол)</div>
+  </div>
   
   <div class="mirror-ctrl">
     <div class="mirror-title">🪞 Зеркала заднего вида</div>
@@ -186,7 +196,8 @@ let leftMirrorMesh=null,rightMirrorMesh=null;
 let leftMirrorBaseQuat=null,rightMirrorBaseQuat=null;
 // оси регулировки: H — вокруг вертикали (влево-вправо), V — вокруг поперечной оси (вверх-вниз)
 let leftYawAxis=null,leftPitchAxis=null,rightYawAxis=null,rightPitchAxis=null;
-const mirrorAngles = { left: { h: 0, v: 0 }, right: { h: 0, v: 0 } };
+const DEFAULT_MIRROR_ANGLES={left:{h:16,v:-2},right:{h:-1,v:1}};
+const mirrorAngles = { left: { h: DEFAULT_MIRROR_ANGLES.left.h, v: DEFAULT_MIRROR_ANGLES.left.v }, right: { h: DEFAULT_MIRROR_ANGLES.right.h, v: DEFAULT_MIRROR_ANGLES.right.v } };
 
 function disposeMirrors(){
   mirrorUpdaters.length=0;
@@ -442,8 +453,8 @@ function updateMirrorRenderList(){
   });
 });
 document.getElementById('resetMirrors').addEventListener('click',()=>{
-  mirrorAngles.left.h=0;mirrorAngles.left.v=0;
-  mirrorAngles.right.h=0;mirrorAngles.right.v=0;
+  mirrorAngles.left.h=DEFAULT_MIRROR_ANGLES.left.h;mirrorAngles.left.v=DEFAULT_MIRROR_ANGLES.left.v;
+  mirrorAngles.right.h=DEFAULT_MIRROR_ANGLES.right.h;mirrorAngles.right.v=DEFAULT_MIRROR_ANGLES.right.v;
   syncUIFromAngles();
   applyMirrorAngles();
   saveMirrorAngles();
@@ -835,6 +846,15 @@ camera.panningSensibility=0;camera.wheelDeltaPercentage=0.01;camera.minZ=0.1;cam
 
 const cabCam=new BABYLON.UniversalCamera('cab',new BABYLON.Vector3(0,1.5,0),scene);
 cabCam.minZ=0.05;cabCam.maxZ=1500;
+const CABFOV_STORE='tr_babylon_cabfov';let cabFovDeg=77;
+try{const d=parseFloat(localStorage.getItem(CABFOV_STORE));if(isFinite(d))cabFovDeg=Math.max(40,Math.min(120,d));}catch(e){}
+const fovEl=document.getElementById('cabFov'),fovValEl=document.getElementById('cabFovV');
+function applyCabFov(){cabCam.fov=cabFovDeg*Math.PI/180;}
+applyCabFov();
+if(fovEl){fovEl.value=cabFovDeg;fovValEl.textContent=Math.round(cabFovDeg)+'°';
+  fovEl.addEventListener('input',()=>{cabFovDeg=parseFloat(fovEl.value)||77;
+    fovValEl.textContent=Math.round(cabFovDeg)+'°';applyCabFov();
+    try{localStorage.setItem(CABFOV_STORE,String(cabFovDeg));}catch(e){}});}
 const cabBtn=document.getElementById('cabBtn');
 function applyCabMaterials(on){
   if(!car)return;
@@ -971,16 +991,16 @@ addEventListener('keydown',e=>{
     e.preventDefault();
   }
   else if(e.code==='Quote'){
-    mirrorAngles.left.h=0;mirrorAngles.left.v=0;
-    mirrorAngles.right.h=0;mirrorAngles.right.v=0;
+    mirrorAngles.left.h=DEFAULT_MIRROR_ANGLES.left.h;mirrorAngles.left.v=DEFAULT_MIRROR_ANGLES.left.v;
+    mirrorAngles.right.h=DEFAULT_MIRROR_ANGLES.right.h;mirrorAngles.right.v=DEFAULT_MIRROR_ANGLES.right.v;
     syncUIFromAngles();
     applyMirrorAngles();
     saveMirrorAngles();
     e.preventDefault();
   }
   else if(e.code==='KeyR'&&!e.ctrlKey&&!e.metaKey){
-    mirrorAngles.left.h=0;mirrorAngles.left.v=0;
-    mirrorAngles.right.h=0;mirrorAngles.right.v=0;
+    mirrorAngles.left.h=DEFAULT_MIRROR_ANGLES.left.h;mirrorAngles.left.v=DEFAULT_MIRROR_ANGLES.left.v;
+    mirrorAngles.right.h=DEFAULT_MIRROR_ANGLES.right.h;mirrorAngles.right.v=DEFAULT_MIRROR_ANGLES.right.v;
     syncUIFromAngles();
     applyMirrorAngles();
     saveMirrorAngles();
