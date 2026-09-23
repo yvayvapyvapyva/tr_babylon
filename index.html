@@ -160,13 +160,24 @@ function aggregateBB(node){
 }
 
 // применить загруженный файл как машину
-function adoptLoadedModel(newMeshes,label,flip){
+function rotateModel(node,yaw,pitch){
+  if(node.rotationQuaternion){
+    let q=node.rotationQuaternion.clone();
+    if(yaw)q=BABYLON.Quaternion.RotationAxis(BABYLON.Axis.Y,yaw).multiply(q);
+    if(pitch)q=BABYLON.Quaternion.RotationAxis(BABYLON.Axis.X,pitch).multiply(q);
+    node.rotationQuaternion=q;
+  }else{
+    node.rotation.y+=(yaw||0);
+    node.rotation.x+=(pitch||0);
+  }
+}
+function adoptLoadedModel(newMeshes,label,flip,pitchFlip){
   const modelRoot=newMeshes.find(m=>!m.parent)||newMeshes[0];
   const carRoot=new BABYLON.TransformNode('carRoot',scene);
   modelRoot.setParent(carRoot,true);
   let bb=aggregateBB(modelRoot);
-  if(bb.size.x>bb.size.z)modelRoot.rotation.y+=Math.PI/2;
-  if(flip)modelRoot.rotation.y+=Math.PI;
+  const yaw=(bb.size.x>bb.size.z?Math.PI/2:0)+(flip?Math.PI:0)+(pitchFlip?Math.PI:0);
+  rotateModel(modelRoot,yaw,pitchFlip?Math.PI:0);
   modelRoot.computeWorldMatrix(true);bb=aggregateBB(modelRoot);
   const s=CAR.length/Math.max(bb.size.x,bb.size.z);
   modelRoot.scaling.setAll(s);
@@ -193,7 +204,7 @@ function adoptLoadedModel(newMeshes,label,flip){
 }
 
 // загрузка модели по url / метке
-async function loadModelByName(name){
+async function loadModelByName(name,pitchFlip){
   const isGLTF=/\.gltf$/i.test(name);
   const isGLB=/\.glb$/i.test(name);
   const flip=/_flip\.(glb|gltf)$/i.test(name);
@@ -202,7 +213,7 @@ async function loadModelByName(name){
     const before=new Set(scene.meshes);
     await BABYLON.SceneLoader.AppendAsync('',name,scene,null,isGLTF?'.gltf':'.glb');
     const nm=scene.meshes.filter(m=>!before.has(m));
-    if(nm.length)adoptLoadedModel(nm,name,flip);
+    if(nm.length)adoptLoadedModel(nm,name,flip,!!pitchFlip);
     else modelStatus.textContent='Не удалось прочитать: '+name;
   }catch(err){
     modelStatus.textContent='Ошибка: '+name;
@@ -236,7 +247,7 @@ fillAutoModel();
 autoModel.addEventListener('change',()=>{
   const v=autoModel.value;
   if(!v)usePrimitiveCar();
-  else loadModelByName(v);
+  else loadModelByName(v,true);
 });
 
 // выбор файла с диска
