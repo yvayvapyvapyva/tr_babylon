@@ -99,6 +99,7 @@
     #ui.collapsed{width:auto;max-height:none;overflow:visible;padding:8px 10px}
     .collapse-btn,#clear,#cabBtn,#resetMirrors{min-height:42px;font-size:13px;padding:8px 6px}
     #collapseBtn{margin-bottom:10px}
+    #ui.collapsed #collapseBtn{margin-bottom:0}
     .modes{gap:8px}
     .modes button{min-height:44px;font-size:13px;padding:10px 4px}
     .mirror-row{margin-bottom:10px}
@@ -118,8 +119,8 @@
 
 <canvas id="renderCanvas"></canvas>
 
-<div id="ui">
-  <button id="collapseBtn" class="collapse-btn">— Свернуть панель</button>
+<div id="ui" class="collapsed">
+  <button id="collapseBtn" class="collapse-btn">⚙ Панель</button>
   <div id="uiBody">
   <div class="cone-toggle"><label><input type="checkbox" id="conesOn"> Установка / удаление конусов</label></div>
   <div class="modes">
