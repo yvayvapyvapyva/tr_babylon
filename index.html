@@ -198,9 +198,9 @@ function disposeMirrors(){
   leftMirrorBaseQuat=null;rightMirrorBaseQuat=null;
   leftYawAxis=null;leftPitchAxis=null;rightYawAxis=null;rightPitchAxis=null;
 }
-scene.onBeforeRenderObservable.add(()=>{
-  for(let i=0;i<mirrorUpdaters.length;i++)mirrorUpdaters[i]();
-});
+// ИСПРАВЛЕНО: ранний обработчик updateMirrorPlane удалён.
+// Обновление плоскостей зеркал перенесено в основной цикл onBeforeRenderObservable,
+// чтобы оно выполнялось ПОСЛЕ обновления позиции автомобиля (без лага на 1 кадр).
 
 // Нормаль поверхности стекла зеркала (самая «плоская» ось геометрии, PCA)
 function mirrorSurfaceNormalLocal(mesh){
@@ -1091,14 +1091,29 @@ const PHYS=1/120;let physAcc=0;
 scene.onBeforeRenderObservable.add(()=>{
   const realDt=Math.min(engine.getDeltaTime()/1000,0.1);
   physAcc=Math.min(physAcc+realDt,0.25);
-  while(physAcc>=PHYS){updateCar(PHYS);physAcc-=PHYS;}
+  
+  // 1. СНАЧАЛА обновляем физику и позицию автомобиля
+  while(physAcc>=PHYS){
+    updateCar(PHYS);
+    physAcc-=PHYS;
+  }
+  
+  // 2. ИСПРАВЛЕНО: обновляем плоскости зеркал ПОСЛЕ перемещения машины.
+  // Так отражение использует актуальную позицию и не «отстаёт» на 1 кадр.
+  for(let i=0; i<mirrorUpdaters.length; i++){
+    mirrorUpdaters[i]();
+  }
+  
+  // 3. Далее обновляем камеру и проверяем коллизии
   if(cabMode){
     const L=10.45,HX=-0.38,HY=carHeight*0.85,HZ=-0.1,
       sy=Math.sin(headYaw),cy=Math.cos(headYaw);
     cabCam.position.copyFrom(driverPoint(new BABYLON.Vector3(HX,HY,HZ)));
     cabCam.setTarget(driverPoint(new BABYLON.Vector3(HX+L*sy,HY+L*Math.tan(headPitch),HZ+L*cy)));
   }
-  updateCamera();checkCollisions();});
+  updateCamera();
+  checkCollisions();
+});
 engine.runRenderLoop(()=>scene.render());
 addEventListener('resize',()=>engine.resize());
 setMode('place');
