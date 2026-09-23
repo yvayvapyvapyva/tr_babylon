@@ -340,13 +340,12 @@ function updateCar(dt){
   const target=steerInput*CAR.maxSteer,rate=1.6;
   if(steerAngle<target)steerAngle=Math.min(target,steerAngle+rate*dt);
   else if(steerAngle>target)steerAngle=Math.max(target,steerAngle-rate*dt);
+  const s0=Math.sin(heading),c0=Math.cos(heading);
   heading+=(speed/CAR.wheelbase)*Math.tan(steerAngle)*dt;
-  const s=Math.sin(heading),c=Math.cos(heading);
+  const s1=Math.sin(heading),c1=Math.cos(heading);
   const rz=rearAxleOffset();
-  let rx=car.position.x+rz*s,rzw=car.position.z+rz*c;
-  rx+=s*speed*dt;rzw+=c*speed*dt;
-  car.position.x=Math.max(-48,Math.min(48,rx-rz*s));
-  car.position.z=Math.max(-48,Math.min(48,rzw-rz*c));
+  car.position.x=Math.max(-48,Math.min(48,car.position.x+rz*s0+s0*speed*dt-rz*s1));
+  car.position.z=Math.max(-48,Math.min(48,car.position.z+rz*c0+c0*speed*dt-rz*c1));
   car.rotation.y=heading;
   const roll=speed*dt;
   spinPivots.forEach(sp=>sp.node.rotation.x+=roll/sp.radius);
