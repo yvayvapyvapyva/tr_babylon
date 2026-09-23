@@ -235,8 +235,8 @@ CAR.maxSteer=Math.atan(CAR.wheelbase/CAR.turnRadius);
 const hemi=new BABYLON.HemisphericLight('hemi',new BABYLON.Vector3(0,1,0),scene);hemi.intensity=0.55;
 const dir=new BABYLON.DirectionalLight('dir',new BABYLON.Vector3(-0.5,-1,-0.3),scene);
 dir.position=new BABYLON.Vector3(60,90,40);dir.intensity=0.9;
-const shadowGen=new BABYLON.ShadowGenerator(isMobile?1024:2048,dir);
-shadowGen.useBlurExponentialShadowMap=true;shadowGen.blurKernel=isMobile?8:16;
+const shadowGen=new BABYLON.ShadowGenerator(isMobile?512:2048,dir);
+  shadowGen.useBlurExponentialShadowMap=true;shadowGen.blurKernel=isMobile?4:16;
 
 const ground=BABYLON.MeshBuilder.CreateGround('ground',{width:100,height:100,subdivisions:2},scene);
 const groundMat=new BABYLON.StandardMaterial('gmat',scene);
