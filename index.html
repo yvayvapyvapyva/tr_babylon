@@ -985,8 +985,8 @@ function syncBlinkBtns(){
   if(blkL)blkL.classList.toggle('active',blinkerLeft);
   if(blkR)blkR.classList.toggle('active',blinkerRight);
 }
-if(blkL)blkL.addEventListener('click',()=>{blinkerLeft=!blinkerLeft;if(blinkerLeft)blinkerRight=false;syncBlinkBtns();});
-if(blkR)blkR.addEventListener('click',()=>{blinkerRight=!blinkerRight;if(blinkerRight)blinkerLeft=false;syncBlinkBtns();});
+if(blkL)blkL.addEventListener('pointerdown',e=>{e.preventDefault();blinkerLeft=!blinkerLeft;if(blinkerLeft)blinkerRight=false;syncBlinkBtns();});
+if(blkR)blkR.addEventListener('pointerdown',e=>{e.preventDefault();blinkerRight=!blinkerRight;if(blinkerRight)blinkerLeft=false;syncBlinkBtns();});
 document.addEventListener('contextmenu',e=>{
   const t=e.target;
   if(t&&t.closest&&(t.closest('#driveCtrl')||(t.closest('#ui')&&t.closest('button,.collapse-btn'))))e.preventDefault();
