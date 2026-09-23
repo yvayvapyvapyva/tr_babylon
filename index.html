@@ -63,7 +63,9 @@ const engine=new BABYLON.Engine(canvas,true,{stencil:true});
 const scene=new BABYLON.Scene(engine);
 scene.clearColor=new BABYLON.Color4(0.067,0.071,0.075,1);
 
-const CAR={length:4.354,width:1.733,height:1.517,wheelbase:2.634,clearance:0.155,wheelD:0.621,turnRadius:5.25};
+const CAR={length:4.354,width:1.733,height:1.517,wheelbase:2.634,clearance:0.155,wheelD:0.621};
+CAR.turnDiameter=10.5;
+CAR.turnRadius=(CAR.turnDiameter-CAR.width)/2;
 CAR.wheelR=CAR.wheelD/2;
 CAR.maxSteer=Math.atan(CAR.wheelbase/CAR.turnRadius);
 
