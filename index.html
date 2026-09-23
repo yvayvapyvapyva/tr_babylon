@@ -64,12 +64,19 @@
     display:flex;align-items:center;justify-content:center}
   .dv-btn.on,.dv-btn:active{background:#ff6d00;color:#1a1200;border-color:#ff6d00}
   .dv-btn.active{background:#62d0df;color:#1a1200;border-color:#62d0df}
-  .dv-wheelzone{display:flex;align-items:flex-start;gap:min(4vw,40px);pointer-events:none;margin-right:2vw;height:auto}
+  .dv-wheelzone{position:relative;display:flex;align-items:flex-start;gap:min(4vw,40px);pointer-events:none;margin-right:2vw;height:auto}
   .dv-blink{pointer-events:auto;width:max(40px,calc((min(30vw,500px,50vh - 30px) - 8px)*0.32));aspect-ratio:1;
     font-size:clamp(16px,6vw,34px);color:#fff;background:rgba(12,22,32,.85);border:1px solid #2a4257;
     border-radius:50%;cursor:pointer;user-select:none;-webkit-user-select:none;
     -webkit-tap-highlight-color:transparent;display:flex;align-items:center;justify-content:center;touch-action:none}
   .dv-blink.active{background:#ffd60a;color:#1a1200;border-color:#ffd60a}
+  .dv-rightcol{display:flex;flex-direction:column;gap:8px;pointer-events:none;margin-top:0}
+  .dv-zoombtn{pointer-events:auto;width:max(40px,calc((min(30vw,500px,50vh - 30px) - 8px)*0.32));
+    aspect-ratio:1;font-size:26px;line-height:1;color:#fff;
+    background:rgba(12,22,32,.85);border:1px solid #2a4257;border-radius:50%;cursor:pointer;
+    user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent;
+    display:flex;align-items:center;justify-content:center;touch-action:none}
+  .dv-zoombtn:active{background:#ff6d00;color:#1a1200;border-color:#ff6d00}
   #driveCtrl,#driveCtrl *{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
   #ui button,#ui .collapse-btn{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
   .dv-wheelwrap{position:relative;width:min(30vw,500px,calc(50vh - 30px));display:flex;flex-direction:column;
@@ -195,7 +202,11 @@
         </div>
       </div>
     </div>
-    <button class="dv-blink" id="dvBlinkR" aria-label="Правый поворотник">▶</button>
+    <div class="dv-rightcol">
+      <button class="dv-blink" id="dvBlinkR" aria-label="Правый поворотник">▶</button>
+      <button class="dv-zoombtn" id="dvZoomIn" aria-label="Приблизить">+</button>
+      <button class="dv-zoombtn" id="dvZoomOut" aria-label="Отдалить">−</button>
+    </div>
   </div>
 </div>
 
@@ -987,6 +998,28 @@ function syncBlinkBtns(){
 }
 if(blkL)blkL.addEventListener('pointerdown',e=>{e.preventDefault();blinkerLeft=!blinkerLeft;if(blinkerLeft)blinkerRight=false;syncBlinkBtns();});
 if(blkR)blkR.addEventListener('pointerdown',e=>{e.preventDefault();blinkerRight=!blinkerRight;if(blinkerRight)blinkerLeft=false;syncBlinkBtns();});
+const zIn=document.getElementById('dvZoomIn'),zOut=document.getElementById('dvZoomOut');
+function zoomStep(k){
+  if(cabMode){
+    cabFovDeg=Math.max(40,Math.min(120,cabFovDeg+(k<1?-3:3)));
+    applyCabFov();
+    if(fovEl)fovEl.value=cabFovDeg;
+    if(fovValEl)fovValEl.textContent=Math.round(cabFovDeg)+'°';
+    try{localStorage.setItem(CABFOV_STORE,String(cabFovDeg));}catch(e){}
+    return;
+  }
+  camera.radius=Math.max(camera.lowerRadiusLimit,Math.min(camera.upperRadiusLimit,camera.radius*k));
+}
+function bindZoom(el,k){
+  if(!el)return;
+  let t=null;
+  const stop=()=>{if(t){clearInterval(t);t=null;}};
+  el.addEventListener('pointerdown',e=>{e.preventDefault();zoomStep(k);t=setInterval(()=>zoomStep(k),130);});
+  el.addEventListener('pointerup',stop);el.addEventListener('pointercancel',stop);
+  el.addEventListener('pointerleave',stop);el.addEventListener('lostpointercapture',stop);
+}
+bindZoom(zIn,0.9);
+bindZoom(zOut,1.1);
 document.addEventListener('contextmenu',e=>{
   const t=e.target;
   if(t&&t.closest&&(t.closest('#driveCtrl')||(t.closest('#ui')&&t.closest('button,.collapse-btn'))))e.preventDefault();
