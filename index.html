@@ -290,6 +290,8 @@ modelFile.addEventListener('change',async e=>{
 });
 
 usePrimitiveCar();
+autoModel.value='auto/Logan2_2017.glb';
+loadModelByName('auto/Logan2_2017.glb',true);
 loadCones();
 
 const camera=new BABYLON.ArcRotateCamera('cam',-Math.PI/2,1.15,11,new BABYLON.Vector3(0,0,0),scene);
@@ -336,7 +338,7 @@ function updateCar(dt){
   if(throttle>0)speed+=12*dt;else if(throttle<0)speed-=12*dt;
   else{if(speed>0)speed=Math.max(0,speed-7*dt);else speed=Math.min(0,speed+7*dt);}
   if(keys.brake){if(speed>0)speed=Math.max(0,speed-25*dt);else speed=Math.min(0,speed+25*dt);}
-  speed=Math.max(-6,Math.min(14,speed));
+  speed=Math.max(-6,Math.min(8/3.6,speed));
   const target=steerInput*CAR.maxSteer,rate=1.6;
   if(steerAngle<target)steerAngle=Math.min(target,steerAngle+rate*dt);
   else if(steerAngle>target)steerAngle=Math.max(target,steerAngle-rate*dt);
