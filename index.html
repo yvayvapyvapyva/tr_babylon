@@ -56,19 +56,27 @@
 #driveCtrl{position:fixed;left:0;right:0;bottom:0;z-index:8;display:none;align-items:flex-end;
     justify-content:space-between;pointer-events:none;padding:0}
   .dv-btns{display:flex;flex-direction:column;gap:8px;pointer-events:auto;box-sizing:border-box;
-    width:25%;height:auto;justify-content:center;align-items:center;padding:0 0 8px 16px}
+    width:25%;height:auto;align-items:flex-start;padding:0 0 8px 16px}
+  .dv-row{display:flex;gap:8px;pointer-events:auto}
   .dv-btn{width:calc((min(30vw,500px,50vh - 30px) - 8px)/2);aspect-ratio:1;font-size:clamp(20px,7vw,40px);
     color:#d8e5ee;background:rgba(12,22,32,.85);border:1px solid #2a4257;border-radius:14px;cursor:pointer;
     touch-action:none;user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent;
     display:flex;align-items:center;justify-content:center}
   .dv-btn.on,.dv-btn:active{background:#ff6d00;color:#1a1200;border-color:#ff6d00}
-  .dv-wheelwrap{position:relative;width:30%;height:auto;display:flex;flex-direction:column;
+  .dv-btn.active{background:#62d0df;color:#1a1200;border-color:#62d0df}
+  .dv-wheelzone{display:flex;align-items:center;gap:12px;pointer-events:none;margin-right:2vw;height:auto}
+  .dv-blink{pointer-events:auto;width:calc((min(30vw,500px,50vh - 30px) - 8px)/2);aspect-ratio:1;
+    font-size:clamp(16px,6vw,34px);color:#fff;background:rgba(12,22,32,.85);border:1px solid #2a4257;
+    border-radius:50%;cursor:pointer;user-select:none;-webkit-user-select:none;
+    -webkit-tap-highlight-color:transparent;display:flex;align-items:center;justify-content:center;touch-action:none}
+  .dv-blink.active{background:#ffd60a;color:#1a1200;border-color:#ffd60a}
+  .dv-wheelwrap{position:relative;width:min(30vw,500px,calc(50vh - 30px));display:flex;flex-direction:column;
     align-items:flex-end;justify-content:flex-end;pointer-events:none;box-sizing:border-box;padding:0}
   .dv-wheel{position:relative;border-radius:50%;pointer-events:auto;touch-action:none;cursor:grab;
     -webkit-tap-highlight-color:transparent;box-sizing:border-box;
     background:radial-gradient(circle at 35% 30%,#22313f,#0c1620 72%);
     border:7px solid #2a4257;box-shadow:0 0 0 4px rgba(12,22,32,.6),0 6px 18px rgba(0,0,0,.5);
-    width:min(100%,500px,calc(50vh - 30px));aspect-ratio:1;margin-bottom:12px;margin-right:2vw}
+    width:min(100%,500px,calc(50vh - 30px));aspect-ratio:1;margin-bottom:12px}
   .dv-rot{position:absolute;inset:0;transition:transform .06s linear}
   .dv-knob{position:absolute;top:-4%;left:50%;transform:translateX(-50%);width:22%;aspect-ratio:1;
     border-radius:50%;background:#ff6d00;border:2px solid #1a1200;box-shadow:0 2px 6px rgba(0,0,0,.5)}
@@ -76,7 +84,7 @@
     border-radius:50%;background:#1c2c3a;border:2px solid #2a4257}
   .dv-ind{position:relative;width:min(100%,500px,calc(50vh - 30px));height:8px;
     background:rgba(12,22,32,.85);border:1px solid #2a4257;border-radius:4px;overflow:hidden;
-    pointer-events:none;margin:0 2vw 8px 0;flex:0 0 auto}
+    pointer-events:none;margin:0 0 8px 0;flex:0 0 auto}
   .dv-ind-marker{position:absolute;top:-1px;width:3px;height:10px;left:50%;transform:translateX(-50%);
     background:#ff6d00;border-radius:2px}
   @media (pointer:coarse){
@@ -168,16 +176,23 @@
 <div id="driveCtrl">
   <div class="dv-btns">
     <button class="dv-btn" id="dvFwd" aria-label="Вперёд">▲</button>
-    <button class="dv-btn" id="dvBack" aria-label="Назад">▼</button>
+    <div class="dv-row">
+      <button class="dv-btn" id="dvBack" aria-label="Назад">▼</button>
+      <button class="dv-btn dv-view" id="dvView" aria-label="Переключить вид">🪑</button>
+    </div>
   </div>
-  <div class="dv-wheelwrap">
-    <div class="dv-ind"><div class="dv-ind-marker" id="dvIndMarker"></div></div>
-    <div class="dv-wheel" id="dvWheel">
-      <div class="dv-rot" id="dvRot">
-        <div class="dv-hub"></div>
-        <div class="dv-knob" id="dvKnob"></div>
+  <div class="dv-wheelzone">
+    <button class="dv-blink" id="dvBlinkL" aria-label="Левый поворотник">◀</button>
+    <div class="dv-wheelwrap">
+      <div class="dv-ind"><div class="dv-ind-marker" id="dvIndMarker"></div></div>
+      <div class="dv-wheel" id="dvWheel">
+        <div class="dv-rot" id="dvRot">
+          <div class="dv-hub"></div>
+          <div class="dv-knob" id="dvKnob"></div>
+        </div>
       </div>
     </div>
+    <button class="dv-blink" id="dvBlinkR" aria-label="Правый поворотник">▶</button>
   </div>
 </div>
 
@@ -950,8 +965,25 @@ function setCabMode(b){
   scene.activeCamera=b?cabCam:camera;
   if(b){camera.detachControl();applyCabMaterials(true);}
   else{applyCabMaterials(false);camera.detachControl();camera.attachControl(canvas,true);}
+  syncDvView();
 }
 cabBtn.addEventListener('click',()=>setCabMode(!cabMode));
+const dvView=document.getElementById('dvView');
+function syncDvView(){
+  if(!dvView)return;
+  dvView.textContent='👁';
+  dvView.classList.toggle('active',cabMode);
+  dvView.setAttribute('aria-label',cabMode?'Вид: салон. Переключить наружу':'Вид: снаружи. Переключить в салон');
+}
+if(dvView)dvView.addEventListener('click',()=>setCabMode(!cabMode));
+syncDvView();
+const blkL=document.getElementById('dvBlinkL'),blkR=document.getElementById('dvBlinkR');
+function syncBlinkBtns(){
+  if(blkL)blkL.classList.toggle('active',blinkerLeft);
+  if(blkR)blkR.classList.toggle('active',blinkerRight);
+}
+if(blkL)blkL.addEventListener('click',()=>{blinkerLeft=!blinkerLeft;if(blinkerLeft)blinkerRight=false;syncBlinkBtns();});
+if(blkR)blkR.addEventListener('click',()=>{blinkerRight=!blinkerRight;if(blinkerRight)blinkerLeft=false;syncBlinkBtns();});
 canvas.addEventListener('pointerdown',e=>{
   if(pickMode){
     const r=canvas.getBoundingClientRect();
@@ -1168,7 +1200,7 @@ function updateCar(dt){
   const roll=speed*dt;
   spinPivots.forEach(sp=>sp.node.rotation.x+=roll/sp.radius);
   steerPivots.forEach(s=>s.rotation.y=steerAngle);
-  blinkTimer+=dt;toggleBlink();
+  blinkTimer+=dt;toggleBlink();syncBlinkBtns();
   const bdbg=document.getElementById('blinkdbg');
   if(bdbg){
     const on=(blinkTimer%0.55)<0.30;
