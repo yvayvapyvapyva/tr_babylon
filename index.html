@@ -1119,7 +1119,13 @@ let touchSteerEnabled=false,touchSteerAngle=0;
   wheel.addEventListener('pointerdown',e=>{
     e.preventDefault();
     const r=wheel.getBoundingClientRect(),cx=r.left+r.width/2,cy=r.top+r.height/2;
-    rotDrag={last:Math.atan2(e.clientY-cy,e.clientX-cx),cx,cy};
+    const a=Math.atan2(e.clientY-cy,e.clientX-cx);
+    const target=a*180/Math.PI+90;
+    wAng=target+Math.round((wAng-target)/360)*360;
+    wAng=Math.max(-WMAX,Math.min(WMAX,wAng));
+    rotEl.style.transform='rotate('+wAng+'deg)';
+    touchSteerEnabled=true;touchSteerAngle=(wAng/WMAX)*CAR.maxSteer;
+    rotDrag={last:a,cx,cy};
     try{wheel.setPointerCapture(e.pointerId);}catch(err){}
   });
   wheel.addEventListener('pointermove',e=>{
