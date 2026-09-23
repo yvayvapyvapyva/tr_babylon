@@ -954,15 +954,13 @@ camera.panningSensibility=0;camera.wheelDeltaPercentage=0.01;camera.minZ=0.1;cam
 
 const cabCam=new BABYLON.UniversalCamera('cab',new BABYLON.Vector3(0,1.5,0),scene);
 cabCam.minZ=0.05;cabCam.maxZ=1500;
-const CABFOV_STORE='tr_babylon_cabfov';let cabFovDeg=77;
-try{const d=parseFloat(localStorage.getItem(CABFOV_STORE));if(isFinite(d))cabFovDeg=Math.max(40,Math.min(120,d));}catch(e){}
+let cabFovDeg=85;
 const fovEl=document.getElementById('cabFov'),fovValEl=document.getElementById('cabFovV');
 function applyCabFov(){cabCam.fov=cabFovDeg*Math.PI/180;}
 applyCabFov();
 if(fovEl){fovEl.value=cabFovDeg;fovValEl.textContent=Math.round(cabFovDeg)+'°';
-  fovEl.addEventListener('input',()=>{cabFovDeg=parseFloat(fovEl.value)||77;
-    fovValEl.textContent=Math.round(cabFovDeg)+'°';applyCabFov();
-    try{localStorage.setItem(CABFOV_STORE,String(cabFovDeg));}catch(e){}});}
+  fovEl.addEventListener('input',()=>{cabFovDeg=parseFloat(fovEl.value)||85;
+    fovValEl.textContent=Math.round(cabFovDeg)+'°';applyCabFov();});}
 const cabBtn=document.getElementById('cabBtn');
 function applyCabMaterials(on){
   if(!car)return;
@@ -1000,9 +998,8 @@ if(blkL)blkL.addEventListener('pointerdown',e=>{e.preventDefault();blinkerLeft=!
 if(blkR)blkR.addEventListener('pointerdown',e=>{e.preventDefault();blinkerRight=!blinkerRight;if(blinkerRight)blinkerLeft=false;syncBlinkBtns();});
 const zIn=document.getElementById('dvZoomIn'),zOut=document.getElementById('dvZoomOut');
 function applyFov(){applyCabFov();if(fovEl)fovEl.value=cabFovDeg;if(fovValEl)fovValEl.textContent=Math.round(cabFovDeg)+'°';}
-function saveFov(){try{localStorage.setItem(CABFOV_STORE,String(cabFovDeg));}catch(e){}}
 function zoomStep(k){
-  if(cabMode){cabFovDeg=Math.max(40,Math.min(120,cabFovDeg+(k<1?-3:3)));applyFov();saveFov();return;}
+  if(cabMode){cabFovDeg=Math.max(40,Math.min(120,cabFovDeg+(k<1?-3:3)));applyFov();return;}
   camera.radius=Math.max(camera.lowerRadiusLimit,Math.min(camera.upperRadiusLimit,camera.radius*k));
 }
 function zoomHold(k,dt){
@@ -1021,7 +1018,6 @@ function bindZoom(el,k){
   };
   const stop=()=>{
     if(raf){cancelAnimationFrame(raf);raf=null;lastT=0;}
-    if(cabMode)saveFov();
   };
   el.addEventListener('pointerdown',e=>{e.preventDefault();zoomStep(k);
     if(!raf){lastT=0;raf=requestAnimationFrame(tick);}});
