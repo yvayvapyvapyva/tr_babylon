@@ -1109,14 +1109,13 @@ let touchSteerEnabled=false,touchSteerAngle=0;
   wheel.addEventListener('pointerdown',e=>{
     e.preventDefault();
     const r=wheel.getBoundingClientRect(),cx=r.left+r.width/2,cy=r.top+r.height/2;
-    rotDrag={last:Math.atan2(e.clientY-cy,e.clientX-cx)};
+    rotDrag={last:Math.atan2(e.clientY-cy,e.clientX-cx),cx,cy};
     try{wheel.setPointerCapture(e.pointerId);}catch(err){}
   });
   wheel.addEventListener('pointermove',e=>{
     if(!rotDrag)return;
     e.preventDefault();
-    const r=wheel.getBoundingClientRect(),cx=r.left+r.width/2,cy=r.top+r.height/2;
-    const a=Math.atan2(e.clientY-cy,e.clientX-cx);
+    const a=Math.atan2(e.clientY-rotDrag.cy,e.clientX-rotDrag.cx);
     let d=a-rotDrag.last;
     while(d>Math.PI)d-=Math.PI*2;while(d<-Math.PI)d+=Math.PI*2;
     rotDrag.last=a;
