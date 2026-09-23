@@ -48,7 +48,7 @@
   </div>
   <div class="count">Конусов: <b id="count">0</b></div>
   <div id="hintline">Клик по площадке — поставить конус (шаг 0,25 м)</div>
-  <div class="drive">Езда: <b>W/A/S/D</b> или стрелки · <b>Space</b> — тормоз</div>
+  <div class="drive">Езда: <b>W/A/S/D</b> или стрелки · <b>Space</b> — тормоз · <b>Q/E</b> — поворотник</div>
   <div class="tele">Скорость: <b id="spd">0</b> км/ч · Руль: <b id="str">0°</b></div>
   <button id="clear">Очистить конусы (C)</button>
   <button id="cabBtn">Обзор: кабина (V)</button>
@@ -120,8 +120,11 @@ function loadCones(){try{const data=JSON.parse(localStorage.getItem(STORE_KEY)||
 // ── машина ─────────────────────────────────────────────
 let car=null,steerPivots=[],spinPivots=[],primitiveRoot=null,modelCarRoot=null;
 let cabMode=false;const cabMats=new Map();
-let headYaw=0,headTurn=false;
+let headYaw=0,headPitch=0,headTurn=false;
 let carHeight=CAR.height;
+let steeringWheelNode=null,steeringBaseQuat=null,blinkTimer=0;
+let blinkerLeft=false,blinkerRight=false;
+let leftGlow=null,rightGlow=null,leftZone=null,rightZone=null;
 
 function createPrimitiveCar(){
   const root=new BABYLON.TransformNode('car',scene);
@@ -307,7 +310,106 @@ function adoptLoadedModel(newMeshes,label,flip,pitchFlip){
   disposeCurrentCar();
   modelCarRoot=carRoot;car=carRoot;steerPivots=steer;spinPivots=spin;
   car.position.set(0,0,0);
+  setupCarExtras(modelRoot);
   if(cabMode)applyCabMaterials(true);
+}
+
+function clipHalf(mesh,dir,label){
+  const geo=mesh.geometry;if(!geo)return null;
+  const pos=geo.getVerticesData(BABYLON.VertexBuffer.PositionKind);
+  const idx=geo.getIndices();if(!idx||!pos)return null;
+  const no=geo.getVerticesData(BABYLON.VertexBuffer.NormalKind);
+  const uv=geo.getVerticesData(BABYLON.VertexBuffer.UVKind);
+  const col=geo.getVerticesData(BABYLON.VertexBuffer.ColorKind);
+  const wm=mesh.computeWorldMatrix(true).clone();
+  const wx=v=>BABYLON.Vector3.TransformCoordinates(new BABYLON.Vector3(pos[v],pos[v+1],pos[v+2]),wm).x;
+  const vmap=new Map(),p=[],n=[],u=[],c=[],oi=[];
+  for(let i=0;i<idx.length;i+=3){
+    const a=idx[i]*3,b=idx[i+1]*3,cc=idx[i+2]*3;
+    const cx=(wx(a)+wx(b)+wx(cc))/3;
+    if((dir<0&&cx>-0.002)||(dir>0&&cx<0.002))continue;
+    for(const vi of[a,b,cc]){
+      const vvi=vi/3;let nv=vmap.get(vvi);
+      if(nv===undefined){nv=p.length/3;vmap.set(vvi,nv);
+        for(let j=0;j<3;j++)p.push(pos[vi+j]);
+        if(no)for(let j=0;j<3;j++)n.push(no[vi+j]);
+        if(uv){u.push(uv[vvi*2],uv[vvi*2+1]);}
+        if(col)for(let j=0;j<4;j++)c.push(col[vvi*4+j]);
+      }
+      oi.push(nv);
+    }
+  }
+  if(!oi.length)return null;
+  const vd=new BABYLON.VertexData();
+  vd.positions=p;if(no)vd.normals=n;if(uv)vd.uvs=u;if(col)vd.colors=c;vd.indices=oi;
+  const m=new BABYLON.Mesh(mesh.name+label,scene);
+  vd.applyToMesh(m);
+  m.material=mesh.material;
+  m.parent=mesh.parent;
+  m.position.copyFrom(mesh.position);m.rotation.copyFrom(mesh.rotation);
+  if(mesh.rotationQuaternion)m.rotationQuaternion=mesh.rotationQuaternion.clone();else m.rotationQuaternion=null;
+  m.scaling.copyFrom(mesh.scaling);
+  m.isPickable=false;m.isVisible=false;
+  return m;
+}
+function makeBlinkZone(side,sign,gl,parent){
+  const b=gl.getBoundingInfo().boundingBox;
+  const cy=b.centerWorld.y,cz=b.maximumWorld.z;
+  const sx=b.maximumWorld.x-b.minimumWorld.x;
+  const m=BABYLON.MeshBuilder.CreateBox('blinkZone'+side,{width:sx*0.55,height:0.08,depth:0.012},scene);
+  m.position.set(sign*sx*0.34,cy,cz+0.012);
+  m.parent=parent;
+  const mat=new BABYLON.StandardMaterial('blinkZMat'+side,scene);
+  mat.emissiveColor=new BABYLON.Color3(1,0.6,0.1);
+  mat.diffuseColor=new BABYLON.Color3(0.15,0.09,0.02);
+  mat.specularColor=new BABYLON.Color3(0,0,0);
+  mat.backFaceCulling=false;
+  m.material=mat;m.isPickable=false;m.isVisible=false;
+  return m;
+}
+function setupCarExtras(modelRoot){
+  steeringWheelNode=null;steeringBaseQuat=null;blinkTimer=0;
+  blinkerLeft=false;blinkerRight=false;
+  leftGlow=rightGlow=null;if(leftZone){leftZone.dispose();rightZone.dispose();leftZone=rightZone=null;}
+  const parts=modelRoot.getChildMeshes();
+  const wheels=parts.filter(m=>/steering_wheel/i.test(m.name)
+    &&!/_Dash_Screen|_Dash_Chrome|_Dash_Plsatic|_Dash_Plastic_N/i.test(m.name));
+  const wn=wheels.length?wheels[0].parent:null;
+  if(wn&&wheels.length){
+    const pivot=new BABYLON.TransformNode('SWpivot',scene);
+    pivot.parent=wn.parent||modelRoot;
+    pivot.scaling.copyFrom(wn.scaling);
+    if(wn.rotationQuaternion)pivot.rotationQuaternion=wn.rotationQuaternion.clone();
+    else pivot.rotationQuaternion=BABYLON.Quaternion.FromEulerAngles(wn.rotation.x,wn.rotation.y,wn.rotation.z);
+    let hx=0,hy=0,hz=0;
+    wheels.forEach(m=>{m.computeWorldMatrix(true);m.refreshBoundingInfo();
+      const c=m.getBoundingInfo().boundingBox.centerWorld;hx+=c.x;hy+=c.y;hz+=c.z;});
+    const hub=new BABYLON.Vector3(hx/wheels.length,hy/wheels.length,hz/wheels.length);
+    if(pivot.parent){
+      const pl=pivot.parent.getWorldMatrix().clone().invert();
+      pivot.position=BABYLON.Vector3.TransformCoordinates(hub,pl);
+    }else pivot.position.copyFrom(hub);
+    wheels.forEach(m=>m.setParent(pivot,true));
+    steeringWheelNode=pivot;
+    steeringBaseQuat=pivot.rotationQuaternion.clone();
+  }
+  const glowM=parts.find(m=>/rear_indicator/i.test(m.name)&&/_glow/i.test(m.name));
+  if(glowM){
+    leftGlow=clipHalf(glowM,-1,'_tL');rightGlow=clipHalf(glowM,1,'_tR');
+    if(leftGlow&&rightGlow)glowM.isVisible=false;
+    else{leftGlow=rightGlow=null;}
+  }
+  const gl=parts.find(m=>/headlight/i.test(m.name)&&/glass_light/i.test(m.name));
+  if(gl){
+    leftZone=makeBlinkZone('L',-1,gl,modelRoot);rightZone=makeBlinkZone('R',1,gl,modelRoot);
+  }
+}
+function toggleBlink(){
+  const on=(blinkTimer%0.55)<0.30;
+  if(blinkerLeft){if(leftGlow)leftGlow.isVisible=on;if(leftZone)leftZone.isVisible=on;}
+  else{if(leftGlow)leftGlow.isVisible=false;if(leftZone)leftZone.isVisible=false;}
+  if(blinkerRight){if(rightGlow)rightGlow.isVisible=on;if(rightZone)rightZone.isVisible=on;}
+  else{if(rightGlow)rightGlow.isVisible=false;if(rightZone)rightZone.isVisible=false;}
 }
 
 // загрузка модели по url / метке
@@ -347,7 +449,7 @@ function applyCabMaterials(on){
 }
 function setCabMode(b){
   cabMode=b;
-  if(b)headYaw=0;else headTurn=false;
+  if(b){headYaw=0;headPitch=0;}else headTurn=false;
   cabBtn.textContent=b?'Обзор: сзади (V)':'Обзор: кабина (V)';
   cabBtn.classList.toggle('active',b);
   scene.activeCamera=b?cabCam:camera;
@@ -363,6 +465,8 @@ addEventListener('pointermove',e=>{
   if(cabMode&&headTurn&&!dragging){
     headYaw-=e.movementX*0.005;
     if(headYaw>Math.PI)headYaw-=Math.PI*2;if(headYaw<-Math.PI)headYaw+=Math.PI*2;
+    headPitch-=e.movementY*0.005;
+    headPitch=Math.max(-0.349,Math.min(0.349,headPitch));
   }
 });
 function driverPoint(localOff){
@@ -397,7 +501,10 @@ addEventListener('keydown',e=>{const a=keyMap[e.code];
   if(a!==undefined){keys[a]=true;if(e.code.startsWith('Arrow')||e.code==='Space')e.preventDefault();}
   if(e.code==='Digit1')setMode('place');else if(e.code==='Digit2')setMode('move');
   else if(e.code==='Digit3')setMode('delete');else if(e.code==='KeyC')clearCones();
-  else if(e.code==='KeyV')setCabMode(!cabMode);});
+  else if(e.code==='KeyV')setCabMode(!cabMode);
+  else if(e.code==='KeyQ'){blinkerLeft=!blinkerLeft;if(blinkerLeft)blinkerRight=false;}
+  else if(e.code==='KeyE'){blinkerRight=!blinkerRight;if(blinkerRight)blinkerLeft=false;}
+});
 addEventListener('keyup',e=>{const a=keyMap[e.code];if(a!==undefined)keys[a]=false;});
 
 let speed=0,heading=0,steerAngle=0;
@@ -429,6 +536,11 @@ function updateCar(dt){
   const roll=speed*dt;
   spinPivots.forEach(sp=>sp.node.rotation.x+=roll/sp.radius);
   steerPivots.forEach(s=>s.rotation.y=steerAngle);
+  blinkTimer+=dt;toggleBlink();
+  if(steeringWheelNode){
+    steeringWheelNode.rotationQuaternion=steeringBaseQuat.multiply(
+      BABYLON.Quaternion.RotationAxis(BABYLON.Axis.Y,steerAngle*10));
+  }
   spdEl.textContent=Math.round(Math.abs(speed)*3.6);
   const deg=Math.round(steerAngle*180/Math.PI);
   strEl.textContent=(deg<0?'← ':deg>0?'→ ':'')+Math.abs(deg)+'°';
@@ -487,7 +599,7 @@ scene.onBeforeRenderObservable.add(()=>{const dt=Math.min(engine.getDeltaTime()/
     const L=10.45,HX=-0.38,HY=carHeight*0.85,HZ=-0.1,
       sy=Math.sin(headYaw),cy=Math.cos(headYaw);
     cabCam.position.copyFrom(driverPoint(new BABYLON.Vector3(HX,HY,HZ)));
-    cabCam.setTarget(driverPoint(new BABYLON.Vector3(HX+L*sy,HY,HZ+L*cy)));
+    cabCam.setTarget(driverPoint(new BABYLON.Vector3(HX+L*sy,HY+L*Math.tan(headPitch),HZ+L*cy)));
   }
   updateCar(dt);updateCamera();checkCollisions();});
 engine.runRenderLoop(()=>scene.render());
