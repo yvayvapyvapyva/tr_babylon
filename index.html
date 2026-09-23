@@ -347,16 +347,11 @@ function updateCamera(){const t=camera.target;
   if(Math.abs(speed)>0.5){const desired=Math.atan2(-Math.cos(heading),-Math.sin(heading));
     camera.alpha=lerpAngle(camera.alpha,desired,0.06);}}
 
-function distPointSegment(px,pz,ax,az,bx,bz){
-  const abx=bx-ax,abz=bz-az,apx=px-ax,apz=pz-az;
-  const len2=abx*abx+abz*abz;let t=len2?(apx*abx+apz*abz)/len2:0;t=Math.max(0,Math.min(1,t));
-  return Math.hypot(px-(ax+abx*t),pz-(az+abz*t));}
 function carHits(px,pz){
-  const fwd=new BABYLON.Vector3(Math.sin(heading),0,Math.cos(heading));
-  const half=CAR.wheelbase/2+0.86;
-  const fx=car.position.x+fwd.x*half,fz=car.position.z+fwd.z*half;
-  const rx=car.position.x-fwd.x*half,rz=car.position.z-fwd.z*half;
-  return distPointSegment(px,pz,rx,rz,fx,fz)<(CAR.width/2+0.15);}
+  const dx=px-car.position.x,dz=pz-car.position.z;
+  const c=Math.cos(heading),s=Math.sin(heading);
+  const lx=dx*c-dz*s,lz=dx*s+dz*c;
+  return Math.abs(lx)<=CAR.width/2 && Math.abs(lz)<=CAR.length/2;}
 function knockCone(node,carPos){node.userData.knocked=true;
   const d=node.position.subtract(carPos);d.y=0;
   if(d.lengthSquared()<1e-6)d.set(0,0,1);d.normalize();
