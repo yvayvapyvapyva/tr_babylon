@@ -265,26 +265,14 @@ function adoptLoadedModel(newMeshes,label,flip,pitchFlip){
     if(h){h.forEach(n=>{n.computeWorldMatrix(true);wheelAncestors.add(n);shadowGen.addShadowCaster(n);wheelParts.push(n);});p.dispose();}
     else wheelParts.push(p);
   }catch(e){wheelParts.push(p);}});
-  const clusters=new Map(),hubs=new Map();
-  const clusterAdd=(m,store)=>{try{
+  const clusters=new Map();
+  const clusterAdd=(m)=>{try{
     const c=m.getBoundingInfo().boundingBox.centerWorld;
     const key=Math.round(c.x/0.6)+'_'+Math.round(c.y/0.2)+'_'+Math.round(c.z/0.2);
     if(!clusters.has(key))clusters.set(key,[]);
     clusters.get(key).push(m);
-    if(store)hubs.set(key,{x:c.x,z:c.z});
   }catch(e){}};
-  wheelParts.forEach(m=>clusterAdd(m,true));
-  parts.forEach(p=>{
-    if(!(/rotor|caliper/i.test(p.name)&&!/wheel|steering/i.test(p.name)))return;
-    let a=p.parent;
-    while(a&&a!==modelRoot){if(wheelAncestors.has(a))return;a=a.parent;}
-    p.computeWorldMatrix(true);
-    const c=p.getBoundingInfo().boundingBox.centerWorld;
-    let best=null,bd=1e9;
-    hubs.forEach(h=>{const d=(h.x-c.x)**2+(h.z-c.z)**2;if(d<bd){bd=d;best=h;}});
-    if(!best||bd>0.36)return;
-    wheelAncestors.add(p);clusterAdd(p,false);
-  });
+  wheelParts.forEach(m=>clusterAdd(m));
   const groups=[];clusters.forEach(ms=>{
     let gx=0,gy=0,gz=0;
     ms.forEach(m=>{const c=m.getBoundingInfo().boundingBox.centerWorld;gx+=c.x;gy+=c.y;gz+=c.z;});
@@ -299,10 +287,11 @@ function adoptLoadedModel(newMeshes,label,flip,pitchFlip){
   const merged=new Map();
   groups.forEach((g,i)=>{const r=find(i);if(!merged.has(r))merged.set(r,[]);merged.get(r).push(...g.ms);});
   merged.forEach(ms=>{try{
-    let cx=0,cy=0,cz=0,r=0;
-    ms.forEach(m=>{const b=m.getBoundingInfo().boundingBox,c=b.centerWorld;
-      cx+=c.x;cy+=c.y;cz+=c.z;r=Math.max(r,(b.maximumWorld.y-b.minimumWorld.y)/2);});
-    cx/=ms.length;cy/=ms.length;cz/=ms.length;
+    const mn=new BABYLON.Vector3(Infinity,Infinity,Infinity),mx=new BABYLON.Vector3(-Infinity,-Infinity,-Infinity);
+    ms.forEach(m=>{const b=m.getBoundingInfo().boundingBox;
+      mn.minimizeInPlace(b.minimumWorld);mx.maximizeInPlace(b.maximumWorld);});
+    const cx=(mn.x+mx.x)/2,cy=(mn.y+mx.y)/2,cz=(mn.z+mx.z)/2;
+    const r=Math.max(0.15,(mx.y-mn.y)/2);
     let pivotParent=carRoot,off=new BABYLON.Vector3(cx,cy,cz);
     if(cz>0){const st=new BABYLON.TransformNode('steer',scene);st.parent=carRoot;st.position.set(cx,0,cz);
       steer.push(st);pivotParent=st;off=new BABYLON.Vector3(0,cy,0);}
