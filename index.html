@@ -288,7 +288,20 @@ function adoptLoadedModel(newMeshes,label,flip,pitchFlip){
     if(!best||bd>0.36)return;
     wheelAncestors.add(p);clusterAdd(p,false);
   });
-  clusters.forEach(ms=>{try{
+  const groups=[];clusters.forEach(ms=>{
+    let gx=0,gy=0,gz=0;
+    ms.forEach(m=>{const c=m.getBoundingInfo().boundingBox.centerWorld;gx+=c.x;gy+=c.y;gz+=c.z;});
+    groups.push({ms,cx:gx/ms.length,cy:gy/ms.length,cz:gz/ms.length});
+  });
+  const parent=groups.map((_,i)=>i),find=i=>{while(parent[i]!==i){parent[i]=parent[parent[i]];i=parent[i];}return i;};
+  const TH=0.45*0.45;
+  for(let i=0;i<groups.length;i++)for(let j=i+1;j<groups.length;j++){
+    const dx=groups[i].cx-groups[j].cx,dy=groups[i].cy-groups[j].cy,dz=groups[i].cz-groups[j].cz;
+    if(dx*dx+dy*dy+dz*dz<TH){const a=find(i),b=find(j);if(a!==b)parent[a]=b;}
+  }
+  const merged=new Map();
+  groups.forEach((g,i)=>{const r=find(i);if(!merged.has(r))merged.set(r,[]);merged.get(r).push(...g.ms);});
+  merged.forEach(ms=>{try{
     let cx=0,cy=0,cz=0,r=0;
     ms.forEach(m=>{const b=m.getBoundingInfo().boundingBox,c=b.centerWorld;
       cx+=c.x;cy+=c.y;cz+=c.z;r=Math.max(r,(b.maximumWorld.y-b.minimumWorld.y)/2);});
