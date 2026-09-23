@@ -189,6 +189,48 @@ function rotateModel(node,yaw,pitch){
     node.rotation.x+=(pitch||0);
   }
 }
+function splitWideWheel(mesh){
+  const geo=mesh.geometry;if(!geo)return null;
+  const pos=geo.getVerticesData(BABYLON.VertexBuffer.PositionKind);
+  const idx=geo.getIndices();if(!idx||!pos)return null;
+  const no=geo.getVerticesData(BABYLON.VertexBuffer.NormalKind);
+  const uv=geo.getVerticesData(BABYLON.VertexBuffer.UVKind);
+  const col=geo.getVerticesData(BABYLON.VertexBuffer.ColorKind);
+  const wm=mesh.computeWorldMatrix(true).clone();
+  const wx=v=>BABYLON.Vector3.TransformCoordinates(new BABYLON.Vector3(pos[v],pos[v+1],pos[v+2]),wm).x;
+  const res=[];
+  for(const sign of[-1,1]){
+    const vmap=new Map(),p=[],n=[],u=[],c=[],oi=[];
+    for(let i=0;i<idx.length;i+=3){
+      const a=idx[i]*3,b=idx[i+1]*3,cc=idx[i+2]*3;
+      const cx=(wx(a)+wx(b)+wx(cc))/3;
+      if((sign<0&&cx>-0.03)||(sign>0&&cx<0.03))continue;
+      for(const vi of[a,b,cc]){
+        const vvi=vi/3;let nv=vmap.get(vvi);
+        if(nv===undefined){nv=p.length/3;vmap.set(vvi,nv);
+          for(let j=0;j<3;j++)p.push(pos[vi+j]);
+          if(no)for(let j=0;j<3;j++)n.push(no[vi+j]);
+          if(uv){u.push(uv[vvi*2],uv[vvi*2+1]);}
+          if(col)for(let j=0;j<4;j++)c.push(col[vvi*4+j]);
+        }
+        oi.push(nv);
+      }
+    }
+    if(!oi.length)continue;
+    const vd=new BABYLON.VertexData();
+    vd.positions=p;if(no)vd.normals=n;if(uv)vd.uvs=u;if(col)vd.colors=c;vd.indices=oi;
+    const m=new BABYLON.Mesh(mesh.name+'_Wheel'+(sign<0?'L':'R'),scene);
+    vd.applyToMesh(m);
+    m.material=mesh.material;
+    m.parent=mesh.parent;m.position.copyFrom(mesh.position);
+    m.rotation.copyFrom(mesh.rotation);
+    if(mesh.rotationQuaternion)m.rotationQuaternion=mesh.rotationQuaternion.clone();else m.rotationQuaternion=null;
+    m.scaling.copyFrom(mesh.scaling);
+    m.isPickable=false;
+    res.push(m);
+  }
+  return res.length?res:null;
+}
 function adoptLoadedModel(newMeshes,label,flip,pitchFlip){
   const modelRoot=newMeshes.find(m=>m.name==='__root__')
     ||newMeshes.find(m=>!m.parent&&!['ground','grid','axes','preview'].includes(m.name))
@@ -216,16 +258,40 @@ function adoptLoadedModel(newMeshes,label,flip,pitchFlip){
     while(a&&a!==modelRoot){if(wheelAncestors.has(a))return;a=a.parent;}
     wheelMeshes.push(m);wheelAncestors.add(m);
   });
-  wheelMeshes.forEach(wm=>{try{
-    wm.computeWorldMatrix(true);
-    const b=wm.getBoundingInfo().boundingBox,c=b.centerWorld,r=(b.maximumWorld.y-b.minimumWorld.y)/2;
-    const key=Math.round(c.x/0.4)+'_'+Math.round(c.z/0.4);
-    if(wheelAncestors.has(key))return;wheelAncestors.add(key);
-    let pivotParent=carRoot,off=c;
-    if(c.z>0){const st=new BABYLON.TransformNode('steer',scene);st.parent=carRoot;st.position.set(c.x,0,c.z);
-      steer.push(st);pivotParent=st;off=new BABYLON.Vector3(0,c.y,0);}
+  const clusters=new Map();
+  const carW=bb.size.x,splitThr=carW*0.7;
+  const wheelParts=[],wide=[];
+  parts.forEach(p=>{
+    if(!isWheelName(p.name))return;
+    let a=p.parent;
+    while(a&&a!==modelRoot){if(wheelAncestors.has(a))return;a=a.parent;}
+    p.computeWorldMatrix(true);
+    const b=p.getBoundingInfo().boundingBox,ww=b.maximumWorld,mi=b.minimumWorld;
+    if(ww.x-mi.x>splitThr){wide.push(p);return;}
+    wheelAncestors.add(p);wheelParts.push(p);
+  });
+  wide.forEach(p=>{try{
+    const h=splitWideWheel(p);
+    if(h){h.forEach(n=>{n.computeWorldMatrix(true);wheelAncestors.add(n);shadowGen.addShadowCaster(n);wheelParts.push(n);});p.dispose();}
+    else wheelParts.push(p);
+  }catch(e){wheelParts.push(p);}});
+  wheelParts.forEach(p=>{try{
+    const c=p.getBoundingInfo().boundingBox.centerWorld;
+    const key=Math.round(c.x/0.6)+'_'+Math.round(c.y/0.2)+'_'+Math.round(c.z/0.2);
+    if(!clusters.has(key))clusters.set(key,[]);
+    clusters.get(key).push(p);
+  }catch(e){}});
+  clusters.forEach(ms=>{try{
+    let cx=0,cy=0,cz=0,r=0;
+    ms.forEach(m=>{const b=m.getBoundingInfo().boundingBox,c=b.centerWorld;
+      cx+=c.x;cy+=c.y;cz+=c.z;r=Math.max(r,(b.maximumWorld.y-b.minimumWorld.y)/2);});
+    cx/=ms.length;cy/=ms.length;cz/=ms.length;
+    let pivotParent=carRoot,off=new BABYLON.Vector3(cx,cy,cz);
+    if(cz>0){const st=new BABYLON.TransformNode('steer',scene);st.parent=carRoot;st.position.set(cx,0,cz);
+      steer.push(st);pivotParent=st;off=new BABYLON.Vector3(0,cy,0);}
     const sp=new BABYLON.TransformNode('spin',scene);sp.parent=pivotParent;sp.position.copyFrom(off);
-    wm.setParent(sp,true);spin.push({node:sp,radius:r||CAR.wheelR});
+    ms.forEach(m=>m.setParent(sp,true));
+    spin.push({node:sp,radius:r||CAR.wheelR});
   }catch(e){}});
   disposeCurrentCar();
   modelCarRoot=carRoot;car=carRoot;steerPivots=steer;spinPivots=spin;
@@ -314,8 +380,8 @@ modelFile.addEventListener('change',async e=>{
 });
 
 usePrimitiveCar();
-autoModel.value='auto/Logan2_2017.glb';
-loadModelByName('auto/Logan2_2017.glb',true);
+autoModel.value='auto/toyota_camry.glb';
+loadModelByName('auto/toyota_camry.glb',true);
 loadCones();
 
 const camera=new BABYLON.ArcRotateCamera('cam',-Math.PI/2,1.15,11,new BABYLON.Vector3(0,0,0),scene);
