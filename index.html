@@ -251,14 +251,7 @@ function adoptLoadedModel(newMeshes,label,flip,pitchFlip){
   const parts=modelRoot.getChildMeshes();
   parts.forEach(m=>{shadowGen.addShadowCaster(m);m.isPickable=false;});
   const isWheelName=n=>/wheel|tire|tyre|roue/i.test(n)&&!/steering/i.test(n);
-  const wheelMeshes=[],wheelAncestors=new Set();
-  parts.forEach(m=>{
-    if(!isWheelName(m.name))return;
-    let a=m.parent;
-    while(a&&a!==modelRoot){if(wheelAncestors.has(a))return;a=a.parent;}
-    wheelMeshes.push(m);wheelAncestors.add(m);
-  });
-  const clusters=new Map();
+  const wheelAncestors=new Set();
   const carW=bb.size.x,splitThr=carW*0.7;
   const wheelParts=[],wide=[];
   parts.forEach(p=>{
@@ -275,12 +268,26 @@ function adoptLoadedModel(newMeshes,label,flip,pitchFlip){
     if(h){h.forEach(n=>{n.computeWorldMatrix(true);wheelAncestors.add(n);shadowGen.addShadowCaster(n);wheelParts.push(n);});p.dispose();}
     else wheelParts.push(p);
   }catch(e){wheelParts.push(p);}});
-  wheelParts.forEach(p=>{try{
-    const c=p.getBoundingInfo().boundingBox.centerWorld;
+  const clusters=new Map(),hubs=new Map();
+  const clusterAdd=(m,store)=>{try{
+    const c=m.getBoundingInfo().boundingBox.centerWorld;
     const key=Math.round(c.x/0.6)+'_'+Math.round(c.y/0.2)+'_'+Math.round(c.z/0.2);
     if(!clusters.has(key))clusters.set(key,[]);
-    clusters.get(key).push(p);
-  }catch(e){}});
+    clusters.get(key).push(m);
+    if(store)hubs.set(key,{x:c.x,z:c.z});
+  }catch(e){}};
+  wheelParts.forEach(m=>clusterAdd(m,true));
+  parts.forEach(p=>{
+    if(!(/rotor|caliper/i.test(p.name)&&!/wheel|steering/i.test(p.name)))return;
+    let a=p.parent;
+    while(a&&a!==modelRoot){if(wheelAncestors.has(a))return;a=a.parent;}
+    p.computeWorldMatrix(true);
+    const c=p.getBoundingInfo().boundingBox.centerWorld;
+    let best=null,bd=1e9;
+    hubs.forEach(h=>{const d=(h.x-c.x)**2+(h.z-c.z)**2;if(d<bd){bd=d;best=h;}});
+    if(!best||bd>0.36)return;
+    wheelAncestors.add(p);clusterAdd(p,false);
+  });
   clusters.forEach(ms=>{try{
     let cx=0,cy=0,cz=0,r=0;
     ms.forEach(m=>{const b=m.getBoundingInfo().boundingBox,c=b.centerWorld;
