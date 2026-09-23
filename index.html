@@ -181,7 +181,9 @@ function rotateModel(node,yaw,pitch){
   }
 }
 function adoptLoadedModel(newMeshes,label,flip,pitchFlip){
-  const modelRoot=newMeshes.find(m=>!m.parent)||newMeshes[0];
+  const modelRoot=newMeshes.find(m=>m.name==='__root__')
+    ||newMeshes.find(m=>!m.parent&&!['ground','grid','axes','preview'].includes(m.name))
+    ||newMeshes[0];
   const carRoot=new BABYLON.TransformNode('carRoot',scene);
   modelRoot.setParent(carRoot,true);
   let bb=aggregateBB(modelRoot);
