@@ -54,9 +54,21 @@
   #ui.collapsed #uiBody{display:none}
   #ui.collapsed .collapse-btn{margin-bottom:0}
   @media (max-width:640px){
-    #ui{left:8px;top:8px;width:min(290px,58vw);padding:8px 10px}
-    .modes button{padding:9px 4px}
-    .mirror-row input[type=range]{min-height:22px}
+    #ui{left:3vw;top:8px;width:94vw;max-height:calc(100vh - 16px);overflow-y:auto;
+      padding:10px 12px;font:14px/1.5 system-ui,sans-serif}
+    #ui.collapsed{width:auto;max-height:none;overflow:visible;padding:8px 10px}
+    .collapse-btn,#clear,#cabBtn,#resetMirrors{min-height:42px;font-size:13px;padding:8px 6px}
+    #collapseBtn{margin-bottom:10px}
+    .modes{gap:8px}
+    .modes button{min-height:44px;font-size:13px;padding:10px 4px}
+    .mirror-row{margin-bottom:10px}
+    .mirror-row input[type=range]{min-height:28px;touch-action:auto}
+    .mirror-row label{width:64px;font-size:12px}
+    .mirror-row .val{width:42px;font-size:12px}
+    .mirror-keys,.drive,.tele,.count,#hintline{font-size:12.5px}
+    .mirror-title{font-size:13px;margin-bottom:8px}
+    .cone-toggle{font-size:13.5px;padding:4px 0;margin-bottom:10px}
+    .cone-toggle input{width:20px;height:20px}
   }
 </style>
 <script src="https://cdn.babylonjs.com/babylon.js"></script>
