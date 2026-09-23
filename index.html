@@ -53,6 +53,33 @@
   #ui.collapsed{width:auto;padding:6px 8px}
   #ui.collapsed #uiBody{display:none}
   #ui.collapsed .collapse-btn{margin-bottom:0}
+  #driveCtrl{position:fixed;left:0;right:0;bottom:0;height:150px;z-index:8;display:none;
+    align-items:center;justify-content:space-between;padding:0 22px;
+    background:linear-gradient(transparent,rgba(8,14,20,.55));pointer-events:none}
+  .dv-btns{display:flex;flex-direction:column;gap:10px;pointer-events:auto}
+  .dv-btn{width:66px;height:54px;font-size:26px;color:#d8e5ee;background:rgba(12,22,32,.85);
+    border:1px solid #2a4257;border-radius:12px;cursor:pointer;touch-action:none;user-select:none;
+    -webkit-user-select:none;-webkit-tap-highlight-color:transparent;display:flex;
+    align-items:center;justify-content:center}
+  .dv-btn.on,.dv-btn:active{background:#ff6d00;color:#1a1200;border-color:#ff6d00}
+  .dv-wheel{position:relative;width:124px;height:124px;border-radius:50%;pointer-events:auto;
+    touch-action:none;cursor:grab;-webkit-tap-highlight-color:transparent;
+    background:radial-gradient(circle at 35% 30%,#22313f,#0c1620 72%);
+    border:7px solid #2a4257;box-shadow:0 0 0 4px rgba(12,22,32,.6),0 6px 18px rgba(0,0,0,.5)}
+  .dv-wheelwrap{position:relative;display:flex;flex-direction:column;align-items:center;pointer-events:none;flex:0 0 auto;margin-right:8px}
+  .dv-ind{position:absolute;bottom:calc(100% + 10px);left:50%;transform:translateX(-50%);
+    width:96px;height:8px;background:rgba(12,22,32,.85);border:1px solid #2a4257;border-radius:4px;
+    overflow:hidden;pointer-events:none}
+  .dv-ind-marker{position:absolute;top:-1px;width:3px;height:10px;left:50%;transform:translateX(-50%);
+    background:#ff6d00;border-radius:2px}
+  .dv-rot{position:absolute;inset:0;transition:transform .06s linear}
+  .dv-knob{position:absolute;top:-5px;left:50%;transform:translateX(-50%);width:28px;height:28px;
+    border-radius:50%;background:#ff6d00;border:2px solid #1a1200;box-shadow:0 2px 6px rgba(0,0,0,.5)}
+  .dv-hub{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:28px;height:28px;
+    border-radius:50%;background:#1c2c3a;border:2px solid #2a4257}
+  @media (pointer:coarse){
+    #driveCtrl{display:flex}
+  }
   @media (max-width:640px){
     #ui{left:3vw;top:8px;width:94vw;max-height:calc(100vh - 16px);overflow-y:auto;
       padding:10px 12px;font:14px/1.5 system-ui,sans-serif}
@@ -132,6 +159,22 @@
       Клавиши: <b>[/]</b> левое, <b>;/</b> правое · <b>'</b> сброс
     </div>
   </div>
+  </div>
+</div>
+
+<div id="driveCtrl">
+  <div class="dv-btns">
+    <button class="dv-btn" id="dvFwd" aria-label="Вперёд">▲</button>
+    <button class="dv-btn" id="dvBack" aria-label="Назад">▼</button>
+  </div>
+  <div class="dv-wheelwrap">
+    <div class="dv-ind"><div class="dv-ind-marker" id="dvIndMarker"></div></div>
+    <div class="dv-wheel" id="dvWheel">
+      <div class="dv-rot" id="dvRot">
+        <div class="dv-hub"></div>
+        <div class="dv-knob" id="dvKnob"></div>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -971,6 +1014,49 @@ let pickMode=false;
 const keys={forward:false,back:false,left:false,right:false,brake:false};
 const keyMap={KeyW:'forward',ArrowUp:'forward',KeyS:'back',ArrowDown:'back',
   KeyA:'left',ArrowLeft:'left',KeyD:'right',ArrowRight:'right',Space:'brake'};
+let touchSteerEnabled=false,touchSteerAngle=0;
+
+// ── Сенсорная панель управления (низ экрана) ────────────────
+(function(){
+  const dv=document.getElementById('driveCtrl');if(!dv)return;
+  const fwd=document.getElementById('dvFwd'),back=document.getElementById('dvBack');
+  const wheel=document.getElementById('dvWheel'),rotEl=document.getElementById('dvRot');
+  const WMAX=540;
+  let wAng=0,rotDrag=null;
+  const hold=(el,on)=>{el.addEventListener('pointerdown',e=>{e.preventDefault();keys[on]=true;el.classList.add('on');
+    try{el.setPointerCapture(e.pointerId);}catch(err){}});
+    ['pointerup','pointercancel','pointerleave','lostpointercapture'].forEach(ev=>el.addEventListener(ev,()=>{keys[on]=false;el.classList.remove('on');}));};
+  hold(fwd,'forward');hold(back,'back');
+  wheel.addEventListener('pointerdown',e=>{
+    e.preventDefault();
+    const r=wheel.getBoundingClientRect(),cx=r.left+r.width/2,cy=r.top+r.height/2;
+    rotDrag={last:Math.atan2(e.clientY-cy,e.clientX-cx)};
+    try{wheel.setPointerCapture(e.pointerId);}catch(err){}
+  });
+  wheel.addEventListener('pointermove',e=>{
+    if(!rotDrag)return;
+    e.preventDefault();
+    const r=wheel.getBoundingClientRect(),cx=r.left+r.width/2,cy=r.top+r.height/2;
+    const a=Math.atan2(e.clientY-cy,e.clientX-cx);
+    let d=a-rotDrag.last;
+    while(d>Math.PI)d-=Math.PI*2;while(d<-Math.PI)d+=Math.PI*2;
+    rotDrag.last=a;
+    wAng=Math.max(-WMAX,Math.min(WMAX,wAng+d*180/Math.PI));
+    rotEl.style.transform='rotate('+wAng+'deg)';
+    touchSteerEnabled=true;touchSteerAngle=(wAng/WMAX)*CAR.maxSteer;
+  });
+  const end=e=>{if(rotDrag){rotDrag=null;try{wheel.releasePointerCapture(e.pointerId);}catch(err){}touchSteerEnabled=false;}};
+  wheel.addEventListener('pointerup',end);
+  wheel.addEventListener('pointercancel',end);
+  window.__syncTouchWheel=()=>{
+    let cur;
+    if(rotDrag){cur=wAng/WMAX;}
+    else{wAng=(steerAngle/CAR.maxSteer)*WMAX;cur=steerAngle/CAR.maxSteer;}
+    rotEl.style.transform='rotate('+wAng+'deg)';
+    const ind=document.getElementById('dvIndMarker');
+    if(ind)ind.style.left=(50+cur*48)+'%';
+  };
+})();
 
 // ── Обработка клавиш для регулировки зеркал ────────────────
 function adjustMirror(side,axis,delta){
@@ -1063,9 +1149,12 @@ function updateCar(dt){
   const tau=keys.brake?0.1:0.35;
   speed+=(tgt-speed)*(1-Math.exp(-dt/tau));
   speed=Math.max(-MAXV,Math.min(MAXV,speed));
-  const target=steerInput*CAR.maxSteer,rate=0.8;
+  const touchActive=touchSteerEnabled&&!keys.left&&!keys.right;
+  const target=touchActive?touchSteerAngle:steerInput*CAR.maxSteer;
+  const rate=touchActive?5:0.8;
   if(steerAngle<target)steerAngle=Math.min(target,steerAngle+rate*dt);
   else if(steerAngle>target)steerAngle=Math.max(target,steerAngle-rate*dt);
+  if(window.__syncTouchWheel)window.__syncTouchWheel();
   const s0=Math.sin(heading),c0=Math.cos(heading);
   heading+=(speed/CAR.wheelbase)*Math.tan(steerAngle)*dt;
   const s1=Math.sin(heading),c1=Math.cos(heading);
