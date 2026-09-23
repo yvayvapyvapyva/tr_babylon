@@ -53,6 +53,11 @@
   #ui.collapsed{width:auto;padding:6px 8px}
   #ui.collapsed #uiBody{display:none}
   #ui.collapsed .collapse-btn{margin-bottom:0}
+  @media (max-width:640px){
+    #ui{left:8px;top:8px;width:min(290px,58vw);padding:8px 10px}
+    .modes button{padding:9px 4px}
+    .mirror-row input[type=range]{min-height:22px}
+  }
 </style>
 <script src="https://cdn.babylonjs.com/babylon.js"></script>
 <script src="https://cdn.babylonjs.com/loaders/babylonjs.loaders.min.js"></script>
@@ -122,10 +127,13 @@
 const canvas=document.getElementById('renderCanvas');
 const engine=new BABYLON.Engine(canvas,true,{stencil:true});
 const scene=new BABYLON.Scene(engine);
+const isMobile=/Android|iPhone|iPad|iPod/i.test(navigator.userAgent)||(navigator.maxTouchPoints>1&&Math.max(screen.width,screen.height)<1100);
+if(isMobile)engine.setHardwareScalingLevel(0.6);
+const MIRROR_SIZE=isMobile?512:1024;
 scene.clearColor=new BABYLON.Color4(0.067,0.071,0.075,1);
 
 // ── Повышение резкости и чёткости изображения ─────────────────────
-scene.imageProcessingConfiguration.sharpenEnabled = true;
+scene.imageProcessingConfiguration.sharpenEnabled = !isMobile;
 scene.imageProcessingConfiguration.sharpenEdgeStrength = 0.6;
 scene.imageProcessingConfiguration.sharpenColorStrength = 0.4;
 scene.imageProcessingConfiguration.contrast = 1.1;
@@ -140,8 +148,8 @@ CAR.maxSteer=Math.atan(CAR.wheelbase/CAR.turnRadius);
 const hemi=new BABYLON.HemisphericLight('hemi',new BABYLON.Vector3(0,1,0),scene);hemi.intensity=0.55;
 const dir=new BABYLON.DirectionalLight('dir',new BABYLON.Vector3(-0.5,-1,-0.3),scene);
 dir.position=new BABYLON.Vector3(60,90,40);dir.intensity=0.9;
-const shadowGen=new BABYLON.ShadowGenerator(2048,dir);
-shadowGen.useBlurExponentialShadowMap=true;shadowGen.blurKernel=16;
+const shadowGen=new BABYLON.ShadowGenerator(isMobile?1024:2048,dir);
+shadowGen.useBlurExponentialShadowMap=true;shadowGen.blurKernel=isMobile?8:16;
 
 const ground=BABYLON.MeshBuilder.CreateGround('ground',{width:100,height:100,subdivisions:2},scene);
 const groundMat=new BABYLON.StandardMaterial('gmat',scene);
@@ -392,7 +400,7 @@ function setupMirrorReflections(modelRoot){
     }
     
     // Планарное отражение (MirrorTexture) — идеально ровное зеркало без искажений
-    const tex = new BABYLON.MirrorTexture(name + "_mirrorTex", 1024, scene, true);
+    const tex = new BABYLON.MirrorTexture(name + "_mirrorTex", MIRROR_SIZE, scene, true);
     tex.renderList = mirrorRenderFilter();
     const localN = mirrorSurfaceNormalLocal(mesh);
     
@@ -905,16 +913,20 @@ canvas.addEventListener('pointerdown',e=>{
     if(h)h.textContent='Выбрана деталь: '+desc;
     return;
   }
-  if(cabMode&&!dragging)headTurn=true;
+  if(cabMode&&!dragging){headTurn=true;lastPtr={x:e.clientX,y:e.clientY};}
 });
 addEventListener('pointerup',()=>{headTurn=false;});
 addEventListener('pointercancel',()=>{headTurn=false;});
 addEventListener('blur',()=>{headTurn=false;});
+let lastPtr=null;
 addEventListener('pointermove',e=>{
   if(cabMode&&headTurn&&!dragging){
-    headYaw-=e.movementX*0.005;
+    let mx=e.movementX||0,my=e.movementY||0;
+    if(!mx&&!my&&lastPtr){mx=e.clientX-lastPtr.x;my=e.clientY-lastPtr.y;}
+    lastPtr={x:e.clientX,y:e.clientY};
+    headYaw-=mx*0.005;
     if(headYaw>Math.PI)headYaw-=Math.PI*2;if(headYaw<-Math.PI)headYaw+=Math.PI*2;
-    headPitch+=e.movementY*0.005;
+    headPitch+=my*0.005;
     headPitch=Math.max(-0.349,Math.min(0.349,headPitch));
   }
 });
