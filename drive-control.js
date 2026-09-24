@@ -22,10 +22,23 @@ let touchSteerEnabled=false,touchSteerAngle=0;
   const wheel=document.getElementById('dvWheel'),rotEl=document.getElementById('dvRot');
   const WMAX=540;
   let wAng=0,rotDrag=null;
-  const hold=(el,on)=>{el.addEventListener('pointerdown',e=>{e.preventDefault();keys[on]=true;el.classList.add('on');
-    try{el.setPointerCapture(e.pointerId);}catch(err){}});
-    ['pointerup','pointercancel','pointerleave','lostpointercapture'].forEach(ev=>el.addEventListener(ev,()=>{keys[on]=false;el.classList.remove('on');}));};
-  hold(fwd,'forward');hold(back,'back');
+  // Кнопки вперёд/назад: каждый палец запоминается по pointerId, отпускание
+  // ловится глобально на window. Без setPointerCapture, чтобы не блокировать мультитач.
+  const keyState={forward:new Set(),back:new Set()};
+  const btnByKey={forward:fwd,back:back};
+  const releaseKey=(key,pointerId)=>{
+    const s=keyState[key];if(!s.has(pointerId))return;
+    s.delete(pointerId);
+    if(s.size===0){keys[key]=false;const b=btnByKey[key];if(b)b.classList.remove('on');}
+  };
+  const pressKey=(key,el,pointerId)=>{keyState[key].add(pointerId);keys[key]=true;if(el)el.classList.add('on');};
+  fwd.addEventListener('pointerdown',e=>{e.preventDefault();pressKey('forward',fwd,e.pointerId);});
+  back.addEventListener('pointerdown',e=>{e.preventDefault();pressKey('back',back,e.pointerId);});
+  window.addEventListener('pointerup',e=>{releaseKey('forward',e.pointerId);releaseKey('back',e.pointerId);});
+  window.addEventListener('pointercancel',e=>{releaseKey('forward',e.pointerId);releaseKey('back',e.pointerId);});
+
+  // Сенсорный руль без захвата указателя — движение отслеживается глобально
+  // по pointerId, поэтому в мультитаче остальные кнопки работают.
   wheel.addEventListener('pointerdown',e=>{
     e.preventDefault();
     const r=wheel.getBoundingClientRect(),cx=r.left+r.width/2,cy=r.top+r.height/2;
@@ -35,11 +48,10 @@ let touchSteerEnabled=false,touchSteerAngle=0;
     wAng=Math.max(-WMAX,Math.min(WMAX,wAng));
     rotEl.style.transform='rotate('+wAng+'deg)';
     touchSteerEnabled=true;touchSteerAngle=(wAng/WMAX)*CAR.maxSteer;
-    rotDrag={last:a,cx,cy};
-    try{wheel.setPointerCapture(e.pointerId);}catch(err){}
+    rotDrag={id:e.pointerId,last:a,cx,cy};
   });
-  wheel.addEventListener('pointermove',e=>{
-    if(!rotDrag)return;
+  window.addEventListener('pointermove',e=>{
+    if(!rotDrag||rotDrag.id!==e.pointerId)return;
     e.preventDefault();
     const a=Math.atan2(e.clientY-rotDrag.cy,e.clientX-rotDrag.cx);
     let d=a-rotDrag.last;
@@ -49,9 +61,13 @@ let touchSteerEnabled=false,touchSteerAngle=0;
     rotEl.style.transform='rotate('+wAng+'deg)';
     touchSteerEnabled=true;touchSteerAngle=(wAng/WMAX)*CAR.maxSteer;
   });
-  const end=e=>{if(rotDrag){rotDrag=null;try{wheel.releasePointerCapture(e.pointerId);}catch(err){}touchSteerEnabled=false;}};
-  wheel.addEventListener('pointerup',end);
-  wheel.addEventListener('pointercancel',end);
+  const endDrag=e=>{
+    if(!rotDrag||rotDrag.id!==e.pointerId)return;
+    rotDrag=null;touchSteerEnabled=false;
+  };
+  window.addEventListener('pointerup',endDrag);
+  window.addEventListener('pointercancel',endDrag);
+  window.addEventListener('blur',()=>{rotDrag=null;touchSteerEnabled=false;});
   window.__syncTouchWheel=()=>{
     let cur;
     if(rotDrag){cur=wAng/WMAX;}
