@@ -354,12 +354,12 @@ const canvas=document.getElementById('renderCanvas');
 const engine=new BABYLON.Engine(canvas,true,{stencil:true});
 const scene=new BABYLON.Scene(engine);
 const isMobile=/Android|iPhone|iPad|iPod/i.test(navigator.userAgent)||(navigator.maxTouchPoints>1&&Math.max(screen.width,screen.height)<1100);
-if(isMobile)engine.setHardwareScalingLevel(0.5);
+if(isMobile)engine.setHardwareScalingLevel(0.6);
 let MIRROR_SIZE=isMobile?256:1024;
 scene.clearColor=new BABYLON.Color4(0.067,0.071,0.075,1);
 
 // ── Повышение резкости и чёткости изображения ─────────────────────
-scene.imageProcessingConfiguration.sharpenEnabled = !isMobile;
+scene.imageProcessingConfiguration.sharpenEnabled = true;
 scene.imageProcessingConfiguration.sharpenEdgeStrength = 0.6;
 scene.imageProcessingConfiguration.sharpenColorStrength = 0.4;
 scene.imageProcessingConfiguration.contrast = 1.1;
@@ -374,8 +374,8 @@ CAR.maxSteer=Math.atan(CAR.wheelbase/CAR.turnRadius);
 const hemi=new BABYLON.HemisphericLight('hemi',new BABYLON.Vector3(0,1,0),scene);hemi.intensity=0.55;
 const dir=new BABYLON.DirectionalLight('dir',new BABYLON.Vector3(-0.5,-1,-0.3),scene);
 dir.position=new BABYLON.Vector3(60,90,40);dir.intensity=0.9;
-const shadowGen=new BABYLON.ShadowGenerator(isMobile?256:2048,dir);
-  shadowGen.useBlurExponentialShadowMap=!isMobile;shadowGen.blurKernel=isMobile?2:16;
+const shadowGen=new BABYLON.ShadowGenerator(isMobile?512:2048,dir);
+  shadowGen.useBlurExponentialShadowMap=true;shadowGen.blurKernel=isMobile?4:16;
 
 const ground=BABYLON.MeshBuilder.CreateGround('ground',{width:100,height:100,subdivisions:2},scene);
 const groundMat=new BABYLON.StandardMaterial('gmat',scene);
