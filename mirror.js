@@ -17,6 +17,7 @@
 // ── ОТРАЖЕНИЯ И РЕГУЛИРОВКА ЗЕРКАЛ ────────────────────────
 let leftMirrorTex=null,rightMirrorTex=null,rearMirrorTex=null;
 const mirrorUpdaters=[];
+const mirrorEntries=[];
 let leftMirrorPivot=null,rightMirrorPivot=null;
 let leftMirrorMesh=null,rightMirrorMesh=null;
 let leftMirrorBaseQuat=null,rightMirrorBaseQuat=null;
@@ -27,6 +28,7 @@ const mirrorAngles = { left: { h: DEFAULT_MIRROR_ANGLES.left.h, v: DEFAULT_MIRRO
 
 function disposeMirrors(){
   mirrorUpdaters.length=0;
+  mirrorEntries.length=0;
   if(leftMirrorTex){try{leftMirrorTex.dispose();}catch(e){}leftMirrorTex=null;}
   if(rightMirrorTex){try{rightMirrorTex.dispose();}catch(e){}rightMirrorTex=null;}
   if(rearMirrorTex){try{rearMirrorTex.dispose();}catch(e){}rearMirrorTex=null;}
@@ -253,6 +255,9 @@ function setupMirrorReflections(modelRoot){
     mesh.material = mat;
     updateMirrorPlane(tex, mesh, localN);
     
+    // Сохраняем данные зеркала для пересоздания текстур при смене разрешения
+    mirrorEntries.push({key:probeKey,mesh,mat,localN,tex});
+    
     // Сохраняем текстуру для управления
     if(probeKey === 'left') leftMirrorTex = tex;
     else if(probeKey === 'right') rightMirrorTex = tex;
@@ -264,10 +269,22 @@ function setupMirrorReflections(modelRoot){
 }
 
 function setMirrorQuality(size){
+  if(!mirrorEntries.length)return;
   MIRROR_SIZE=size;
-  if(leftMirrorTex)leftMirrorTex.setSize(size);
-  if(rightMirrorTex)rightMirrorTex.setSize(size);
-  if(rearMirrorTex)rearMirrorTex.setSize(size);
+  mirrorEntries.forEach(en=>{if(en.tex){try{en.tex.dispose();}catch(e){}}});
+  leftMirrorTex=null;rightMirrorTex=null;rearMirrorTex=null;
+  mirrorUpdaters.length=0;
+  mirrorEntries.forEach(en=>{
+    const tex=new BABYLON.MirrorTexture(en.key+'_mirrorTex',size,scene,true);
+    tex.renderList=mirrorRenderFilter();
+    en.tex=tex;
+    if(en.mat){en.mat.reflectionTexture=tex;en.mat.reflectionTexture.level=1.0;}
+    if(en.key==='left')leftMirrorTex=tex;
+    else if(en.key==='right')rightMirrorTex=tex;
+    else rearMirrorTex=tex;
+    mirrorUpdaters.push(()=>updateMirrorPlane(tex,en.mesh,en.localN));
+    updateMirrorPlane(tex,en.mesh,en.localN);
+  });
 }
 
 function updateMirrorRenderList(){
