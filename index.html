@@ -2,6 +2,7 @@
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>Площадка 100×100 · модель с диска + конусы</title>
 <style>
   html,body{margin:0;height:100%;background:#111;overflow:hidden}
@@ -107,29 +108,29 @@
   .mirror-keys{color:#7c93a4;font-size:10px;margin-top:4px;line-height:1.4}
   .mirror-keys b{color:#9db4c4}
   @media (max-width:640px),(pointer:coarse){
-    #gearBtn{left:calc(10px + env(safe-area-inset-left,0px));top:calc(10px + env(safe-area-inset-top,0px));width:58px;height:58px;border-radius:16px}
-    #gearBtn svg{width:32px;height:32px}
-    #mapBtn{min-height:48px;font-size:14px;border-radius:10px}
-    #mapBtn svg{width:20px;height:20px}
-    #settingsWin{width:min(94vw,560px);max-height:calc(100vh - 40px);font:15px/1.55 system-ui,sans-serif;border-radius:14px}
-    .sw-head{padding:16px 18px}
-    .sw-title{font-size:17px}
-    .sw-close{width:42px;height:42px;font-size:18px}
-    .sw-body{padding:18px}
-    .sw-sec h3{font-size:12.5px;margin-bottom:11px}
-    #clear,#cabBtn,#camFollowBtn,#resetMirrors,.modes button{min-height:48px;font-size:14px;padding:10px 8px}
+    #gearBtn{left:calc(14px + env(safe-area-inset-left,0px));top:auto;bottom:calc(min(30vw,500px,50vh - 30px) + 34px + env(safe-area-inset-bottom,0px));width:52px;height:52px;border-radius:14px}
+    #gearBtn svg{width:26px;height:26px}
+    #mapBtn{min-height:44px;font-size:13px;border-radius:10px}
+    #mapBtn svg{width:18px;height:18px}
+    #settingsWin{width:min(94vw,500px);max-height:calc(100vh - 40px);font:14px/1.5 system-ui,sans-serif;border-radius:14px}
+    .sw-head{padding:14px 16px}
+    .sw-title{font-size:15px}
+    .sw-close{width:36px;height:36px;font-size:16px}
+    .sw-body{padding:15px 16px}
+    .sw-sec h3{font-size:11.5px;margin-bottom:10px}
+    #clear,#cabBtn,#camFollowBtn,#resetMirrors,.modes button{min-height:44px;font-size:13px;padding:10px 8px}
     .modes{gap:8px}
-    #mapEdit{font-size:15px;padding:14px 14px calc(14px + env(safe-area-inset-bottom,0px))}
-    #mapEdit .me-modes button{min-height:52px;font-size:15px}
-    #mapEdit .me-done,#mapEdit .me-clear{min-height:46px;font-size:14px;padding:8px 16px}
-    #mapEdit .me-hint{font-size:14.5px}
-    .mirror-row{margin-bottom:12px}
-    .mirror-row input[type=range]{min-height:32px;touch-action:auto}
-    .mirror-row label{width:72px;font-size:13px}
-    .mirror-row .val{width:46px;font-size:13px}
-    .mirror-keys,.drive,.tele,.count,#hintline{font-size:13.5px}
-    .cone-toggle{font-size:14.5px;padding:4px 0;margin-bottom:10px}
-    .cone-toggle input{width:20px;height:20px}
+    #mapEdit{font-size:14px;padding:12px 14px calc(12px + env(safe-area-inset-bottom,0px))}
+    #mapEdit .me-modes button{min-height:48px;font-size:14px}
+    #mapEdit .me-done,#mapEdit .me-clear{min-height:44px;font-size:13px;padding:8px 16px}
+    #mapEdit .me-hint{font-size:13.5px}
+    .mirror-row{margin-bottom:10px}
+    .mirror-row input[type=range]{min-height:30px;touch-action:auto}
+    .mirror-row label{width:66px;font-size:12.5px}
+    .mirror-row .val{width:42px;font-size:12.5px}
+    .mirror-keys,.drive,.tele,.count,#hintline{font-size:13px}
+    .cone-toggle{font-size:13.5px;padding:4px 0;margin-bottom:10px}
+    .cone-toggle input{width:18px;height:18px}
   }
 </style>
 <style id="drivePanelStyle">
@@ -178,10 +179,11 @@
   .dv-ind-marker{position:absolute;top:-1px;width:3px;height:10px;left:50%;transform:translateX(-50%);
     background:#ff6d00;border-radius:2px}
   @media (pointer:fine){
-    #driveCtrl{display:flex;left:auto;right:14px;bottom:14px;width:auto;max-width:520px;
+    #driveCtrl{display:flex;left:14px;right:auto;bottom:14px;width:auto;max-width:520px;
       justify-content:flex-end;gap:10px;padding:8px;
       background:rgba(12,22,32,.9);border:1px solid #2a4257;border-radius:14px;
       box-shadow:0 8px 24px rgba(0,0,0,.45);align-items:center}
+    #gearBtn{left:14px;top:auto;bottom:174px}
     .dv-btns{width:auto;padding:0;align-items:flex-start;flex-direction:column}
     .dv-row{gap:6px}
     .dv-btn{width:42px;font-size:18px;border-radius:10px}
