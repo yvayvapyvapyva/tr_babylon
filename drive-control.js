@@ -117,7 +117,7 @@ bindZoom(zOut,1.1);
 // ── Защита от контекстного меню / выделения на мобильных ─────────
 document.addEventListener('contextmenu',e=>{
   const t=e.target;
-  if(t&&t.closest&&(t.closest('#driveCtrl')||(t.closest('#ui')&&t.closest('button,.collapse-btn'))))e.preventDefault();
+  if(t&&t.closest&&(t.closest('#driveCtrl')||t.closest('#settingsWin')))e.preventDefault();
 });
 document.addEventListener('selectstart',e=>{
   const t=e.target;
