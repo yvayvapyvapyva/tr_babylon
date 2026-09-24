@@ -263,6 +263,13 @@ function setupMirrorReflections(modelRoot){
   applyMirrorAngles();
 }
 
+function setMirrorQuality(size){
+  MIRROR_SIZE=size;
+  if(leftMirrorTex)leftMirrorTex.setSize(size);
+  if(rightMirrorTex)rightMirrorTex.setSize(size);
+  if(rearMirrorTex)rearMirrorTex.setSize(size);
+}
+
 function updateMirrorRenderList(){
   const list = mirrorRenderFilter();
   if(leftMirrorTex) leftMirrorTex.renderList = list;
