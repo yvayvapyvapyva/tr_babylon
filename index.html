@@ -955,7 +955,7 @@ scene.onBeforeRenderObservable.add(()=>{
   
   // 3. Далее обновляем камеру и проверяем коллизии
   if(cabMode){
-    const L=10.45,HY=carHeight*0.85,HZ=-0.1,sy=Math.sin(headYaw),cy=Math.cos(headYaw);
+    const L=10.45,HY=carHeight*0.85,HZ=-0.1,sy=Math.sin(heading+headYaw),cy=Math.cos(heading+headYaw);
     let eye;
     if(steeringWheelNode){
       // позиция головы по центру руля влево-вправо, высоту и глубину не трогаем
