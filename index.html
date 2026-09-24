@@ -107,8 +107,8 @@
   .mirror-keys{color:#7c93a4;font-size:10px;margin-top:4px;line-height:1.4}
   .mirror-keys b{color:#9db4c4}
   @media (max-width:640px),(pointer:coarse){
-    #gearBtn{left:10px;top:10px;width:48px;height:48px;border-radius:12px}
-    #gearBtn svg{width:26px;height:26px}
+    #gearBtn{left:calc(10px + env(safe-area-inset-left,0px));top:calc(10px + env(safe-area-inset-top,0px));width:58px;height:58px;border-radius:16px}
+    #gearBtn svg{width:32px;height:32px}
     #mapBtn{min-height:48px;font-size:14px;border-radius:10px}
     #mapBtn svg{width:20px;height:20px}
     #settingsWin{width:min(94vw,560px);max-height:calc(100vh - 40px);font:15px/1.55 system-ui,sans-serif;border-radius:14px}
