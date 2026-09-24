@@ -385,11 +385,11 @@ function gridLines(step,half,y){const lines=[];for(let i=-half;i<=half+1e-6;i+=s
   lines.push([new BABYLON.Vector3(i,y,-half),new BABYLON.Vector3(i,y,half)]);
   lines.push([new BABYLON.Vector3(-half,y,i),new BABYLON.Vector3(half,y,i)]);}return lines;}
 const grid=BABYLON.MeshBuilder.CreateLineSystem('grid',{lines:gridLines(0.5,50,0.01)},scene);
-grid.color=new BABYLON.Color3(0.30,0.30,0.30);grid.isPickable=false;
+grid.color=new BABYLON.Color3(0.30,0.30,0.30);grid.isPickable=false;grid.isVisible=false;
 const axes=BABYLON.MeshBuilder.CreateLineSystem('axes',{lines:[
   [new BABYLON.Vector3(0,0.02,-50),new BABYLON.Vector3(0,0.02,50)],
   [new BABYLON.Vector3(-50,0.02,0),new BABYLON.Vector3(50,0.02,0)]]},scene);
-axes.color=new BABYLON.Color3(0.55,0.55,0.55);axes.isPickable=false;
+axes.color=new BABYLON.Color3(0.55,0.55,0.55);axes.isPickable=false;axes.isVisible=false;
 
 // ── машина ─────────────────────────────────────────────
 let car=null,steerPivots=[],spinPivots=[],primitiveRoot=null,modelCarRoot=null;
@@ -1036,6 +1036,7 @@ function openMapEdit(o){
   document.body.classList.toggle('edit-mode',o);
   mapEdit.classList.toggle('open',o);
   setConesEnabled(o);
+  grid.isVisible=o;axes.isVisible=o;
 }
 mapBtn.addEventListener('click',()=>{
   openSettings(false);
