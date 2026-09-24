@@ -22,7 +22,7 @@ let leftMirrorMesh=null,rightMirrorMesh=null;
 let leftMirrorBaseQuat=null,rightMirrorBaseQuat=null;
 // оси регулировки: H — вокруг вертикали (влево-вправо), V — вокруг поперечной оси (вверх-вниз)
 let leftYawAxis=null,leftPitchAxis=null,rightYawAxis=null,rightPitchAxis=null;
-const DEFAULT_MIRROR_ANGLES={left:{h:16,v:-2},right:{h:-1,v:1}};
+const DEFAULT_MIRROR_ANGLES={left:{h:14,v:1},right:{h:-2,v:2}};
 const mirrorAngles = { left: { h: DEFAULT_MIRROR_ANGLES.left.h, v: DEFAULT_MIRROR_ANGLES.left.v }, right: { h: DEFAULT_MIRROR_ANGLES.right.h, v: DEFAULT_MIRROR_ANGLES.right.v } };
 
 function disposeMirrors(){
@@ -91,20 +91,7 @@ function mirrorRenderFilter(){
   });
 }
 
-const MIRROR_STORE_KEY='tr_babylon_mirror_angles';
-function saveMirrorAngles(){
-  try{localStorage.setItem(MIRROR_STORE_KEY,JSON.stringify(mirrorAngles));}catch(e){}
-}
 function loadMirrorAngles(){
-  try{
-    const data=JSON.parse(localStorage.getItem(MIRROR_STORE_KEY)||'null');
-    if(data&&data.left&&data.right){
-      mirrorAngles.left.h=Math.max(-45,Math.min(45,data.left.h||0));
-      mirrorAngles.left.v=Math.max(-25,Math.min(25,data.left.v||0));
-      mirrorAngles.right.h=Math.max(-45,Math.min(45,data.right.h||0));
-      mirrorAngles.right.v=Math.max(-25,Math.min(25,data.right.v||0));
-    }
-  }catch(e){}
   syncUIFromAngles();
   applyMirrorAngles();
 }
@@ -144,14 +131,12 @@ function adjustMirror(side,axis,delta){
   if(slider)slider.value=mirrorAngles[side][key];
   if(valEl)valEl.textContent=mirrorAngles[side][key]+'°';
   applyMirrorAngles();
-  saveMirrorAngles();
 }
 function resetMirrorAngles(){
   mirrorAngles.left.h=DEFAULT_MIRROR_ANGLES.left.h;mirrorAngles.left.v=DEFAULT_MIRROR_ANGLES.left.v;
   mirrorAngles.right.h=DEFAULT_MIRROR_ANGLES.right.h;mirrorAngles.right.v=DEFAULT_MIRROR_ANGLES.right.v;
   syncUIFromAngles();
   applyMirrorAngles();
-  saveMirrorAngles();
 }
 
 function setupMirrorReflections(modelRoot){
@@ -296,7 +281,6 @@ function updateMirrorRenderList(){
     else if(id==='rightH'){mirrorAngles.right.h=v;document.getElementById('rightHV').textContent=v+'°';}
     else if(id==='rightV'){mirrorAngles.right.v=v;document.getElementById('rightVV').textContent=v+'°';}
     applyMirrorAngles();
-    saveMirrorAngles();
   });
 });
 document.getElementById('resetMirrors').addEventListener('click',resetMirrorAngles);
