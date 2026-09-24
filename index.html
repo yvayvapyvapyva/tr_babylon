@@ -1008,6 +1008,7 @@ scene.onBeforeRenderObservable.add(()=>{
   }
   updateCamera();
   checkCollisions();
+  if(typeof updateFlights==='function')updateFlights(dt);
 });
 let __lastFrame=0;
 addEventListener('load',()=>engine.runRenderLoop(()=>{

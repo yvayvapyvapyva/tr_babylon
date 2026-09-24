@@ -66,12 +66,62 @@ function carHits(px,pz){
   const c=Math.cos(heading),s=Math.sin(heading);
   const lx=dx*c-dz*s,lz=dx*s+dz*c;
   return Math.abs(lx)<=CAR.width/2 && Math.abs(lz)<=CAR.length/2;}
-function knockCone(node,carPos){node.userData.knocked=true;
+// Конусы, которые отлетают после удара (лёгкая физика снаряда)
+const flying=[];
+const fixRestY=0.4,lyingY=0.12;
+function knockCone(node,carPos){
+  const ud=node.userData;ud.knocked=true;
   const d=node.position.subtract(carPos);d.y=0;
-  if(d.lengthSquared()<1e-6)d.set(0,0,1);d.normalize();
-  node.position.addInPlace(d.scale(0.35));
-  const axis=BABYLON.Vector3.Cross(BABYLON.Vector3.Up(),d).normalize();
-  node.rotationQuaternion=BABYLON.Quaternion.RotationAxis(axis,Math.PI/2*0.95);}
+  const dl=d.length();
+  let dir;
+  if(dl<1e-6)dir=new BABYLON.Vector3(Math.sin(heading),0,Math.cos(heading));
+  else dir=d.scale(1/dl);
+  // импульс от направления движения машины + разлёт вбок относительно удара
+  const sign=Math.sign(speed)||1;
+  const mv=new BABYLON.Vector3(Math.sin(heading),0,Math.cos(heading));
+  const lat=new BABYLON.Vector3(Math.cos(heading),0,-Math.sin(heading));
+  const power=1.6+Math.abs(speed)*0.9;
+  const latDot=BABYLON.Vector3.Dot(lat,dir);
+  ud.vel=mv.scale(power*0.75*sign)
+    .add(lat.scale(latDot*power))
+    .add(new BABYLON.Vector3(0,power*0.6+Math.random()*0.3,0));
+  ud.ang=Math.random()*Math.PI*2;
+  ud.spin=(Math.random()*8+5)*((Math.random()<0.5)?1:-1);
+  node.position.y=fixRestY;
+  flying.push(node);
+}
+function landCone(n){
+  const ud=n.userData;ud.vel=null;
+  const ra=Math.random()*Math.PI*2;
+  n.rotationQuaternion=BABYLON.Quaternion.RotationAxis(
+    new BABYLON.Vector3(Math.cos(ra),0,Math.sin(ra)),Math.PI/2*(0.9+Math.random()*0.2));
+  n.position.y=lyingY;
+}
+function updateFlights(dt){
+  if(!flying.length)return;
+  for(let i=flying.length-1;i>=0;i--){
+    const n=flying[i],ud=n.userData;if(!ud||!ud.vel)continue;
+    const v=ud.vel;
+    const drag=Math.max(0,1-0.9*dt);
+    v.x*=drag;v.z*=drag;
+    v.y-=9.8*dt;
+    ud.ang+=ud.spin*dt;
+    n.position.addInPlace(v.scale(dt));
+    // кувыркание вокруг поперечной оси полёта + лёгкое вращение
+    const hl=Math.sqrt(v.x*v.x+v.z*v.z);
+    const axis=(hl>0.1)?new BABYLON.Vector3(-v.z/hl,0,v.x/hl):new BABYLON.Vector3(1,0,0);
+    n.rotationQuaternion=BABYLON.Quaternion.RotationAxis(axis,ud.ang)
+      .multiply(BABYLON.Quaternion.RotationAxis(BABYLON.Axis.Y,ud.ang*0.35));
+    if(n.position.y<=0.1&&v.y<=0){
+      n.position.y=0.1;
+      if(v.y<-0.4){v.y=-v.y*0.35;v.x*=0.55;v.z*=0.55;}
+      else{v.y=0;v.x*=0.7;v.z*=0.7;}
+      if(Math.abs(v.x)<0.12&&Math.abs(v.z)<0.12&&Math.abs(v.y)<0.15){
+        landCone(n);flying.splice(i,1);
+      }
+    }
+  }
+}
 function checkCollisions(){for(const node of coneNodes){const ud=node.userData;
   if(!ud||ud.knocked||node===dragging)continue;
   if(carHits(node.position.x,node.position.z))knockCone(node,car.position);}}
@@ -89,6 +139,8 @@ scene.onPointerObservable.add(pi=>{const t=pi.type;
   else if(t===BABYLON.PointerEventTypes.POINTERDOWN){
     if(mode==='move'){const c=pickCone();
       if(c.hit){dragging=c.pickedMesh.parent;const ud=dragging.userData;
+        const fi=flying.indexOf(dragging);if(fi>=0)flying.splice(fi,1);
+        if(ud.vel)ud.vel=null;
         dragging.rotationQuaternion=BABYLON.Quaternion.Identity();ud.knocked=false;
         dragOldKey=ud.cellKey;occupied.delete(dragOldKey);
         camera.detachControl();canvas.style.cursor='grabbing';}}}
