@@ -29,11 +29,11 @@ function createCone(){const node=new BABYLON.TransformNode('cone',scene);node.ro
   coneNodes.push(node);return node;}
 function addConeAt(x,z){const k=key(x,z);if(occupied.has(k))return;occupied.add(k);
   const n=createCone();n.position.set(x,0,z);n.userData={cellKey:k,knocked:false};updateCount();saveCones();
-  updateMirrorRenderList();}
+  if(typeof updateMirrorRenderList==='function')updateMirrorRenderList();}
 function deleteCone(n){occupied.delete(n.userData.cellKey);
   n.getChildMeshes().forEach(m=>shadowGen.removeShadowCaster(m));
   const i=coneNodes.indexOf(n);if(i>=0)coneNodes.splice(i,1);n.dispose();updateCount();saveCones();
-  updateMirrorRenderList();}
+  if(typeof updateMirrorRenderList==='function')updateMirrorRenderList();}
 function clearCones(){[...coneNodes].forEach(deleteCone);}
 function updateCount(){countEl.textContent=coneNodes.length;}
 
