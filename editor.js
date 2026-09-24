@@ -44,6 +44,116 @@ function saveCones(){try{localStorage.setItem(STORE_KEY,JSON.stringify(
 function loadCones(){try{const data=JSON.parse(localStorage.getItem(STORE_KEY)||'[]');
   if(Array.isArray(data))data.forEach(([x,z])=>{if(typeof x==='number'&&typeof z==='number')addConeAt(x,z);});}catch(e){}}
 
+// ── белая разметка (линии) ──────────────────────────────────
+const STORE_KEY_MARK='tr_babylon_markings';
+const countLinesEl=document.getElementById('countLines');
+const finishLineBtn=document.getElementById('finishLineBtn');
+const lineWidth=0.1,lineH=0.006,lineY=lineH/2+0.0012;
+const lineMat=new BABYLON.StandardMaterial('lm',scene);
+lineMat.diffuseColor=new BABYLON.Color3(1,1,1);
+lineMat.specularColor=new BABYLON.Color3(0.15,0.15,0.15);
+const prevLineMat=new BABYLON.StandardMaterial('lpm',scene);
+prevLineMat.diffuseColor=new BABYLON.Color3(1,1,1);
+prevLineMat.alpha=0.55;
+prevLineMat.specularColor=new BABYLON.Color3(0,0,0);
+const previewSeg=BABYLON.MeshBuilder.CreateBox('linePrev',{width:lineWidth,height:lineH,depth:1},scene);
+previewSeg.material=prevLineMat;previewSeg.isVisible=false;previewSeg.isPickable=false;
+const markings=[];       // массивы точек [[x,z],...] по линиям
+const linePolyMeshes=[]; // параллельно: меши сегментов каждой линии
+let openLine=null;       // текущая открытая полилиния {pts,meshes}
+function makeLineSegment(a,b){
+  const ax=a[0],az=a[1],bx=b[0],bz=b[1];
+  const dx=bx-ax,dz=bz-az;
+  const L=Math.hypot(dx,dz);
+  if(L<1e-4)return null;
+  const seg=BABYLON.MeshBuilder.CreateBox('lineSeg',{width:lineWidth,height:lineH,depth:L},scene);
+  seg.position.set((ax+bx)/2,lineY,(az+bz)/2);
+  seg.rotation.y=Math.atan2(dx,dz);
+  seg.material=lineMat;
+  seg.isPickable=true;
+  seg.receiveShadows=true;
+  seg.metadata={isLine:true};
+  return seg;
+}
+function updateLineCount(){if(countLinesEl)countLinesEl.textContent=markings.length;syncFinishBtn();}
+function syncFinishBtn(){if(finishLineBtn)finishLineBtn.style.display=(mode==='lines'&&openLine)?'':'none';}
+function updateLinePreview(){
+  if(!openLine)return;
+  const last=openLine.pts[openLine.pts.length-1];
+  const p=pickGround();
+  if(p.hit&&last){
+    const sx=snap(p.pickedPoint.x),sz=snap(p.pickedPoint.z);
+    const dx=sx-last[0],dz=sz-last[1];
+    const L=Math.hypot(dx,dz);
+    if(L>1e-4){
+      previewSeg.position.set((sx+last[0])/2,lineY,(sz+last[1])/2);
+      previewSeg.scaling.set(1,1,L);
+      previewSeg.rotation.y=Math.atan2(dx,dz);
+      previewSeg.isVisible=true;
+    }else previewSeg.isVisible=false;
+  }else previewSeg.isVisible=false;
+}
+function hideLinePreview(){previewSeg.isVisible=false;}
+function startOpenLine(){openLine={pts:[],meshes:[]};syncFinishBtn();}
+function addLinePoint(x,z){
+  if(!openLine)startOpenLine();
+  const last=openLine.pts[openLine.pts.length-1];
+  if(last&&last[0]===x&&last[1]===z)return;
+  openLine.pts.push([x,z]);
+  if(last){const s=makeLineSegment(last,[x,z]);if(s)openLine.meshes.push(s);}
+  updateLinePreview();
+}
+function finishLine(){
+  if(!openLine)return;
+  if(openLine.pts.length>=2){
+    markings.push(openLine.pts);
+    linePolyMeshes.push(openLine.meshes);
+    updateLineCount();
+  }else{
+    openLine.meshes.forEach(m=>{try{m.dispose();}catch(e){}});
+  }
+  openLine=null;
+  hideLinePreview();
+  syncFinishBtn();
+  saveMarkings();
+  if(typeof updateMirrorRenderList==='function')updateMirrorRenderList();
+}
+function saveMarkings(){try{localStorage.setItem(STORE_KEY_MARK,JSON.stringify(markings));}catch(e){}}
+function pushPolyline(pts){
+  const meshes=[];
+  for(let i=1;i<pts.length;i++){const s=makeLineSegment(pts[i-1],pts[i]);if(s)meshes.push(s);}
+  markings.push(pts);
+  linePolyMeshes.push(meshes);
+}
+function loadMarkings(){try{const d=JSON.parse(localStorage.getItem(STORE_KEY_MARK)||'[]');
+  if(Array.isArray(d))d.forEach(poly=>{
+    if(!Array.isArray(poly)||poly.length<2)return;
+    const pts=poly.filter(p=>Array.isArray(p)&&p.length===2&&typeof p[0]==='number'&&typeof p[1]==='number');
+    if(pts.length>=2)pushPolyline(pts);
+  });
+  updateLineCount();}catch(e){}}
+function deletePolylineFromMesh(mesh){
+  for(let i=0;i<linePolyMeshes.length;i++){
+    if(linePolyMeshes[i].includes(mesh)){
+      linePolyMeshes[i].forEach(m=>{try{m.dispose();}catch(e){}});
+      linePolyMeshes.splice(i,1);
+      markings.splice(i,1);
+      updateLineCount();saveMarkings();
+      if(typeof updateMirrorRenderList==='function')updateMirrorRenderList();
+      return;
+    }
+  }
+}
+function clearLines(){
+  finishLine();
+  markings.length=0;
+  linePolyMeshes.forEach(arr=>arr.forEach(m=>{try{m.dispose();}catch(e){}}));
+  linePolyMeshes.length=0;
+  updateLineCount();saveMarkings();
+  if(typeof updateMirrorRenderList==='function')updateMirrorRenderList();
+}
+if(finishLineBtn)finishLineBtn.addEventListener('click',finishLine);
+
 const preview=BABYLON.MeshBuilder.CreateTorus('preview',{diameter:0.4,thickness:0.04,tessellation:28},scene);
 const prevMat=new BABYLON.StandardMaterial('pm',scene);
 prevMat.diffuseColor=new BABYLON.Color3(1,0.43,0);prevMat.emissiveColor=new BABYLON.Color3(1,0.43,0);
@@ -53,13 +163,18 @@ preview.material=prevMat;preview.position.y=0.05;preview.isVisible=false;preview
 let mode='place',dragging=null,dragOldKey=null,conesEnabled=false;
 const hintline=document.getElementById('hintline');
 const HINTS={place:'Клик по площадке — поставить конус (шаг 0,25 м)',
-  move:'Зажми конус и перетащи в новый узел',delete:'Клик по конусу — удалить его'};
-const CURSORS={place:'crosshair',move:'grab',delete:'pointer'};
-function setMode(m){mode=m;
+  move:'Зажми конус и перетащи в новый узел',delete:'Клик по конусу или линии — удалить',
+  lines:'Кликай по площадке: точки соединяются в белую линию. «Завершить линию» — начать новую'};
+const CURSORS={place:'crosshair',move:'grab',delete:'pointer',lines:'crosshair'};
+function setMode(m){
+  if(mode==='lines'&&m!=='lines')finishLine();
+  mode=m;
   document.querySelectorAll('.modes button').forEach(b=>b.classList.toggle('active',b.dataset.mode===m));
-  hintline.textContent=HINTS[m];canvas.style.cursor=CURSORS[m];preview.isVisible=false;}
+  hintline.textContent=HINTS[m];canvas.style.cursor=CURSORS[m];preview.isVisible=false;
+  syncFinishBtn();
+}
 document.querySelectorAll('.modes button').forEach(b=>b.addEventListener('click',()=>{if(!conesEnabled)return;setMode(b.dataset.mode)}));
-document.getElementById('clear').addEventListener('click',clearCones);
+document.getElementById('clear').addEventListener('click',()=>{clearCones();clearLines();});
 
 function carHits(px,pz){
   const dx=px-car.position.x,dz=pz-car.position.z;
@@ -128,14 +243,16 @@ function checkCollisions(){for(const node of coneNodes){const ud=node.userData;
 
 const pickGround=()=>scene.pick(scene.pointerX,scene.pointerY,m=>m.name==='ground');
 const pickCone=()=>scene.pick(scene.pointerX,scene.pointerY,m=>m.metadata&&m.metadata.isCone);
+const pickLine=()=>scene.pick(scene.pointerX,scene.pointerY,m=>m.metadata&&m.metadata.isLine);
 scene.onPointerObservable.add(pi=>{const t=pi.type;
   if(!conesEnabled)return;
   if(t===BABYLON.PointerEventTypes.POINTERMOVE){
     const p=pickGround();
     if(p.hit){const sx=snap(p.pickedPoint.x),sz=snap(p.pickedPoint.z);
-      preview.position.set(sx,0.05,sz);preview.isVisible=(mode==='place')||!!dragging;
+      preview.position.set(sx,0.05,sz);preview.isVisible=(mode==='place')||!!dragging||mode==='lines';
       if(dragging)dragging.position.set(sx,0,sz);}
-    else if(!dragging)preview.isVisible=false;}
+    else if(!dragging){preview.isVisible=false;hideLinePreview();}
+    if(mode==='lines')updateLinePreview();else hideLinePreview();}
   else if(t===BABYLON.PointerEventTypes.POINTERDOWN){
     if(mode==='move'){const c=pickCone();
       if(c.hit){dragging=c.pickedMesh.parent;const ud=dragging.userData;
@@ -154,13 +271,19 @@ scene.onPointerObservable.add(pi=>{const t=pi.type;
       dragging=null;camera.attachControl(canvas,true);canvas.style.cursor=CURSORS[mode];}}
   else if(t===BABYLON.PointerEventTypes.POINTERTAP){
     if(dragging)return;
-    if(mode==='delete'){const c=pickCone();if(c.hit)deleteCone(c.pickedMesh.parent);}
-    else if(mode==='place'){const p=pickGround();if(p.hit)addConeAt(snap(p.pickedPoint.x),snap(p.pickedPoint.z));}}});
+    if(mode==='delete'){
+      const c=pickCone();if(c.hit)deleteCone(c.pickedMesh.parent);
+      else{const l=pickLine();if(l.hit)deletePolylineFromMesh(l.pickedMesh);}
+    }
+    else if(mode==='place'){const p=pickGround();if(p.hit)addConeAt(snap(p.pickedPoint.x),snap(p.pickedPoint.z));}
+    else if(mode==='lines'){const p=pickGround();if(p.hit)addLinePoint(snap(p.pickedPoint.x),snap(p.pickedPoint.z));}}});
 
 setMode('place');
 loadCones();
+loadMarkings();
 
 function setConesEnabled(on){
+  if(!on)finishLine();
   conesEnabled=on;
   document.querySelector('.modes').classList.toggle('disabled',!on);
   preview.isVisible=false;

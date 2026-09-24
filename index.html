@@ -230,13 +230,15 @@ document.addEventListener('pointerdown',tgFullscreen,{once:true});
     <button class="me-done" id="mapDone">Готово</button>
   </div>
   <div class="me-row">
-    <span class="me-count">Конусов: <b id="count">0</b></span>
+    <span class="me-count">Конусов: <b id="count">0</b> · Линий: <b id="countLines">0</b></span>
+    <button class="me-clear" id="finishLineBtn" style="display:none">Завершить линию</button>
     <button class="me-clear" id="clear">Очистить</button>
   </div>
   <div class="modes me-modes">
     <button data-mode="place" class="active">Поставить</button>
     <button data-mode="move">Двигать</button>
     <button data-mode="delete">Удалить</button>
+    <button data-mode="lines">Линии</button>
   </div>
   <div class="me-hint" id="hintline">Клик по площадке — поставить конус (шаг 0,25 м)</div>
 </div>
@@ -974,10 +976,11 @@ addEventListener('keydown',e=>{
   const a=keyMap[e.code];
   if(a!==undefined){keys[a]=true;if(e.code.startsWith('Arrow')||e.code==='Space')e.preventDefault();}
   
-  if(!conesEnabled&&(e.code==='Digit1'||e.code==='Digit2'||e.code==='Digit3'||e.code==='KeyC')){e.preventDefault();return;}
+  if(!conesEnabled&&(e.code==='Digit1'||e.code==='Digit2'||e.code==='Digit3'||e.code==='Digit4'||e.code==='KeyC')){e.preventDefault();return;}
   if(e.code==='Digit1')setMode('place');
   else if(e.code==='Digit2')setMode('move');
   else if(e.code==='Digit3')setMode('delete');
+  else if(e.code==='Digit4')setMode('lines');
   else if(e.code==='KeyC')clearCones();
   else if(e.code==='KeyV')setCabMode(!cabMode);
   else if(e.code==='KeyF'){camFollow=!camFollow;syncCamFollowBtn();}
