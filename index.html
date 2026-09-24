@@ -199,8 +199,23 @@
 </style>
 <script src="https://cdn.babylonjs.com/babylon.js"></script>
 <script src="https://cdn.babylonjs.com/loaders/babylonjs.loaders.min.js"></script>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
 <script>
-const tg=window.Telegram&&window.Telegram.WebApp;if(tg){tg.ready();tg.expand();}
+function tgFullscreen(){
+  try{
+    if(!window.Telegram||!Telegram.WebApp)return;
+    Telegram.WebApp.ready();
+    Telegram.WebApp.expand();
+    if(Telegram.WebApp.setHeaderColor)Telegram.WebApp.setHeaderColor('#111213');
+    if(Telegram.WebApp.setBackgroundColor)Telegram.WebApp.setBackgroundColor('#111213');
+    if(Telegram.WebApp.disableVerticalSwipes)Telegram.WebApp.disableVerticalSwipes();
+    if(Telegram.WebApp.requestFullscreen)Telegram.WebApp.requestFullscreen();
+  }catch(e){}
+}
+tgFullscreen();
+document.addEventListener('DOMContentLoaded',tgFullscreen);
+window.addEventListener('load',tgFullscreen);
+document.addEventListener('pointerdown',tgFullscreen,{once:true});
 </script>
 </head>
 <body>
