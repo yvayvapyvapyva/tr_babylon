@@ -1152,10 +1152,21 @@ scene.onBeforeRenderObservable.add(()=>{
   
   // 3. Далее обновляем камеру и проверяем коллизии
   if(cabMode){
-    const L=10.45,HX=-0.38,HY=carHeight*0.85,HZ=-0.1,
-      sy=Math.sin(headYaw),cy=Math.cos(headYaw);
-    cabCam.position.copyFrom(driverPoint(new BABYLON.Vector3(HX,HY,HZ)));
-    cabCam.setTarget(driverPoint(new BABYLON.Vector3(HX+L*sy,HY+L*Math.tan(headPitch),HZ+L*cy)));
+    const L=10.45,HY=carHeight*0.85,HZ=-0.1,sy=Math.sin(headYaw),cy=Math.cos(headYaw);
+    let eye;
+    if(steeringWheelNode){
+      // позиция головы по центру руля влево-вправо, высоту и глубину не трогаем
+      steeringWheelNode.computeWorldMatrix(true);
+      const wp=steeringWheelNode.getAbsolutePosition();
+      const lat=new BABYLON.Vector3(Math.cos(heading),0,-Math.sin(heading));
+      const localX=BABYLON.Vector3.Dot(wp.subtract(car.position),lat);
+      eye=driverPoint(new BABYLON.Vector3(localX,HY,HZ));
+    }else{
+      const HX=-0.38;
+      eye=driverPoint(new BABYLON.Vector3(HX,HY,HZ));
+    }
+    cabCam.position.copyFrom(eye);
+    cabCam.setTarget(eye.add(new BABYLON.Vector3(L*sy,L*Math.tan(headPitch),L*cy)));
   }
   updateCamera();
   checkCollisions();
