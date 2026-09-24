@@ -942,7 +942,7 @@ function updateCamera(){const t=camera.target;
   if(Math.abs(speed)>0.5){const desired=Math.atan2(-Math.cos(heading),-Math.sin(heading));
     camera.alpha=lerpAngle(camera.alpha,desired,0.06);}}
 
-const PHYS=1/120;let physAcc=0;
+const PHYS=1/60;let physAcc=0;
 scene.onBeforeRenderObservable.add(()=>{
   const realDt=Math.min(engine.getDeltaTime()/1000,0.1);
   physAcc=Math.min(physAcc+realDt,0.25);
