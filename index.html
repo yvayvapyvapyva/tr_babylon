@@ -16,6 +16,17 @@
   #gearBtn:hover svg{stroke:#62d0df}
   #gearBtn:active{background:#62d0df}
   #gearBtn:active svg{stroke:#1a1200}
+  #mapBtn{width:100%;padding:10px 0;background:#1c2c3a;color:#9db4c4;
+    border:1px solid #2a4257;border-radius:8px;cursor:pointer;
+    display:flex;align-items:center;justify-content:center;gap:8px;
+    font:600 12px/1 'IBM Plex Sans',system-ui,sans-serif;
+    -webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none}
+  #mapBtn svg{width:18px;height:18px;stroke:#9db4c4;stroke-width:1.7;fill:none;
+    stroke-linecap:round;stroke-linejoin:round;transition:stroke .15s}
+  #mapBtn:hover{border-color:#ff6d00;color:#ff6d00}
+  #mapBtn:hover svg{stroke:#ff6d00}
+  #mapBtn:active{background:#ff6d00;color:#1a1200}
+  #mapBtn:active svg{stroke:#1a1200}
   #settingsBackdrop{position:fixed;inset:0;z-index:18;background:rgba(0,0,0,.5);
     display:none;backdrop-filter:blur(2px)}
   #settingsBackdrop.open{display:block}
@@ -27,6 +38,33 @@
   #settingsWin.open{display:block}
   #settingsWin::-webkit-scrollbar{width:6px}
   #settingsWin::-webkit-scrollbar-thumb{background:#2a4257;border-radius:3px}
+  body.edit-mode #gearBtn{display:none}
+  body.edit-mode #driveCtrl{display:none}
+  #mapEdit{position:fixed;left:0;right:0;bottom:0;z-index:8;display:none;
+    background:rgba(12,22,32,.94);border-top:1px solid #2a4257;
+    backdrop-filter:blur(6px);padding:10px 12px calc(10px + env(safe-area-inset-bottom,0px));
+    font:13px/1.5 'IBM Plex Sans',system-ui,sans-serif;color:#d8e5ee;
+    box-shadow:0 -8px 24px rgba(0,0,0,.45)}
+  #mapEdit.open{display:block}
+  .me-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+  .me-title{font-weight:600;font-size:13px;color:#ff6d00;letter-spacing:.4px}
+  .me-done{background:#1c2c3a;color:#9db4c4;border:1px solid #2a4257;border-radius:8px;
+    font:600 12px/1 inherit;padding:8px 16px;cursor:pointer;
+    -webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none}
+  .me-done:hover{border-color:#62d0df;color:#62d0df}
+  .me-row{display:flex;gap:8px;align-items:center;margin-bottom:8px;justify-content:flex-end}
+  .me-count{color:#7c93a4;font-size:12px;white-space:nowrap;margin-right:auto}
+  .me-count b{color:#ff6d00}
+  .me-clear{background:#1c2c3a;color:#9db4c4;border:1px solid #2a4257;border-radius:8px;
+    font:600 12px/1 inherit;padding:8px 14px;cursor:pointer;white-space:nowrap;
+    -webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none}
+  .me-clear:hover{border-color:#e05e4a;color:#e05e4a}
+  #clear.me-clear{width:auto;padding:8px 14px}
+  .me-modes button{flex:1;min-height:44px;padding:8px 4px;background:#1c2c3a;color:#9db4c4;
+    border:1px solid #2a4257;border-radius:10px;font:600 13px/1 inherit;cursor:pointer;transition:.15s;
+    -webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none}
+  .me-modes button:hover{border-color:#ff6d00;color:#ff6d00}
+  .me-hint{color:#7c93a4;font-size:12px;min-height:18px;margin-top:8px}
   .sw-head{display:flex;align-items:center;justify-content:space-between;
     padding:12px 16px;border-bottom:1px solid #2a4257;position:sticky;top:0;z-index:1;
     background:rgba(12,22,32,.95);backdrop-filter:blur(4px)}
@@ -71,12 +109,18 @@
   @media (max-width:640px){
     #gearBtn{left:10px;top:10px;width:48px;height:48px;border-radius:12px}
     #gearBtn svg{width:26px;height:26px}
+    #mapBtn{min-height:48px;font-size:13px;border-radius:10px}
+    #mapBtn svg{width:20px;height:20px}
     #settingsWin{width:94vw;max-height:calc(100vh - 20px);font:14px/1.5 system-ui,sans-serif;border-radius:14px}
     .sw-head{padding:14px}
     .sw-body{padding:14px}
     #clear,#cabBtn,#resetMirrors,.modes button{min-height:46px;font-size:13px;padding:10px 6px}
     .sw-close{width:38px;height:38px;font-size:17px}
     .modes{gap:8px}
+    #mapEdit{font-size:14px;padding:12px 14px calc(12px + env(safe-area-inset-bottom,0px))}
+    #mapEdit .me-modes button{min-height:50px;font-size:14px}
+    #mapEdit .me-done,#mapEdit .me-clear{min-height:44px;font-size:13px;padding:8px 16px}
+    #mapEdit .me-hint{font-size:13.5px}
     .mirror-row{margin-bottom:10px}
     .mirror-row input[type=range]{min-height:30px;touch-action:auto}
     .mirror-row label{width:64px;font-size:12px}
@@ -113,7 +157,7 @@
     display:flex;align-items:center;justify-content:center;touch-action:none}
   .dv-zoombtn:active{background:#ff6d00;color:#1a1200;border-color:#ff6d00}
   #driveCtrl,#driveCtrl *{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
-  #gearBtn,#settingsWin button,#settingsWin .sw-close{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
+  #gearBtn,#mapBtn,#settingsWin button,#mapEdit button{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
   .dv-wheelwrap{position:relative;width:min(30vw,500px,calc(50vh - 30px));display:flex;flex-direction:column;
     align-items:flex-end;justify-content:flex-end;pointer-events:none;box-sizing:border-box;padding:0}
   .dv-wheel{position:relative;border-radius:50%;pointer-events:auto;touch-action:none;cursor:grab;
@@ -143,6 +187,23 @@
 
 <canvas id="renderCanvas"></canvas>
 
+<div id="mapEdit">
+  <div class="me-head">
+    <span class="me-title">Редактирование карты</span>
+    <button class="me-done" id="mapDone">Готово</button>
+  </div>
+  <div class="me-row">
+    <span class="me-count">Конусов: <b id="count">0</b></span>
+    <button class="me-clear" id="clear">Очистить</button>
+  </div>
+  <div class="modes me-modes">
+    <button data-mode="place" class="active">Поставить</button>
+    <button data-mode="move">Двигать</button>
+    <button data-mode="delete">Удалить</button>
+  </div>
+  <div class="me-hint" id="hintline">Клик по площадке — поставить конус (шаг 0,25 м)</div>
+</div>
+
 <button id="gearBtn" aria-label="Настройки">
   <svg viewBox="0 0 24 24" aria-hidden="true">
     <circle cx="12" cy="12" r="3"/>
@@ -159,16 +220,15 @@
   <div class="sw-body">
 
     <div class="sw-sec">
-      <h3>Конусы</h3>
-      <div class="cone-toggle"><label><input type="checkbox" id="conesOn"> Установка / удаление конусов</label></div>
-      <div class="modes">
-        <button data-mode="place" class="active">Поставить</button>
-        <button data-mode="move">Двигать</button>
-        <button data-mode="delete">Удалить</button>
-      </div>
-      <div class="count">Конусов: <b id="count">0</b></div>
-      <div id="hintline">Клик по площадке — поставить конус (шаг 0,25 м)</div>
-      <button id="clear">Очистить конусы (C)</button>
+      <h3>Карта</h3>
+      <button id="mapBtn">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/>
+          <line x1="8" y1="2" x2="8" y2="18"/>
+          <line x1="16" y1="6" x2="16" y2="22"/>
+        </svg>
+        Редактировать карту
+      </button>
     </div>
 
     <div class="sw-sec">
@@ -924,7 +984,21 @@ function openSettings(o){
 gearBtn.addEventListener('click',()=>openSettings(!settingsWin.classList.contains('open')));
 document.getElementById('settingsClose').addEventListener('click',()=>openSettings(false));
 settingsBackdrop.addEventListener('click',()=>openSettings(false));
-addEventListener('keydown',e=>{if(e.code==='Escape')openSettings(false);});
+
+const mapBtn=document.getElementById('mapBtn');
+const mapEdit=document.getElementById('mapEdit');
+function openMapEdit(o){
+  document.body.classList.toggle('edit-mode',o);
+  mapEdit.classList.toggle('open',o);
+  setConesEnabled(o);
+}
+mapBtn.addEventListener('click',()=>{
+  openSettings(false);
+  openMapEdit(true);
+});
+document.getElementById('mapDone').addEventListener('click',()=>openMapEdit(false));
+function closeAllWindows(){openSettings(false);openMapEdit(false);}
+addEventListener('keydown',e=>{if(e.code==='Escape')closeAllWindows();});
 </script>
 <script src="editor.js"></script>
 <script src="mirror.js"></script>

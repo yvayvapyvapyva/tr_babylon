@@ -108,13 +108,12 @@ scene.onPointerObservable.add(pi=>{const t=pi.type;
 setMode('place');
 loadCones();
 
-const conesOn=document.getElementById('conesOn');
-conesOn.addEventListener('change',()=>{
-  conesEnabled=conesOn.checked;
-  document.querySelector('.modes').classList.toggle('disabled',!conesEnabled);
+function setConesEnabled(on){
+  conesEnabled=on;
+  document.querySelector('.modes').classList.toggle('disabled',!on);
   preview.isVisible=false;
-  hintline.textContent=conesEnabled?HINTS[mode]:'Установка/удаление конусов выключена';
-  if(conesEnabled)setMode(mode);
-});
+  hintline.textContent=on?HINTS[mode]:'Режим редактирования карты выключен';
+  if(on)setMode(mode);
+}
 document.querySelector('.modes').classList.add('disabled');
-hintline.textContent='Установка/удаление конусов выключена';
+hintline.textContent='Режим редактирования карты выключен';
