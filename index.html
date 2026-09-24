@@ -66,6 +66,12 @@
     -webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none}
   .me-modes button:hover{border-color:#ff6d00;color:#ff6d00}
   .me-hint{color:#7c93a4;font-size:12px;min-height:18px;margin-top:8px}
+  .me-terr{display:flex;align-items:center;gap:8px;margin-bottom:8px;justify-content:flex-end}
+  .me-terr-label{color:#7c93a4;font-size:12px;white-space:nowrap;margin-right:auto}
+  .me-terr input{width:64px;min-height:36px;box-sizing:border-box;background:#1c2c3a;border:1px solid #2a4257;border-radius:8px;
+    color:#9db4c4;font:600 13px/1 inherit;text-align:center;padding:4px;-webkit-appearance:none;-moz-appearance:textfield}
+  .me-terr input::-webkit-outer-spin-button,.me-terr input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+  .me-terr .x{color:#7c93a4}
   .sw-head{display:flex;align-items:center;justify-content:space-between;
     padding:12px 16px;border-bottom:1px solid #2a4257;position:sticky;top:0;z-index:1;
     background:rgba(12,22,32,.95);backdrop-filter:blur(4px)}
@@ -234,6 +240,13 @@ document.addEventListener('pointerdown',tgFullscreen,{once:true});
     <button class="me-clear" id="finishLineBtn" style="display:none">Завершить линию</button>
     <button class="me-clear" id="clear">Очистить</button>
   </div>
+  <div class="me-terr">
+    <span class="me-terr-label">Территория (Ш × Д), м</span>
+    <input type="number" id="terrW" min="10" max="400" step="5" value="100">
+    <span class="x">×</span>
+    <input type="number" id="terrD" min="10" max="400" step="5" value="100">
+    <button class="me-clear" id="applyTerr">Применить</button>
+  </div>
   <div class="modes me-modes">
     <button data-mode="place" class="active">Поставить</button>
     <button data-mode="move">Двигать</button>
@@ -360,6 +373,14 @@ if(isMobile)engine.setHardwareScalingLevel(0.6);
 let MIRROR_SIZE=isMobile?256:1024;
 scene.clearColor=new BABYLON.Color4(0.45,0.72,0.98,1);
 
+// ── размер огороженной территории ──────────────────────────
+const TERR_FILE='tr_babylon_terr';
+function loadTerritory(){try{const d=JSON.parse(localStorage.getItem(TERR_FILE)||'{}');
+  return{w:Math.max(10,Math.min(400,Math.round(d.w||100))),d:Math.max(10,Math.min(400,Math.round(d.d||100)))};}catch(e){return{w:100,d:100};}}
+const TERR=loadTerritory();
+function saveTerritory(){try{localStorage.setItem(TERR_FILE,JSON.stringify({w:TERR.w,d:TERR.d}));}catch(e){}}
+const TERR_FENCE_OFF=0.65,CURB_TH=0.34,CURB_H=0.17,FENCE_STEP=3.2;
+
 // ── Повышение резкости и чёткости изображения ─────────────────────
 scene.imageProcessingConfiguration.sharpenEnabled = true;
 scene.imageProcessingConfiguration.sharpenEdgeStrength = 0.6;
@@ -394,7 +415,7 @@ glowLayer.intensity=1.6;
 glowLayer.useMainTexture=false;
 glowLayer.addIncludedOnlyMesh(sun);
 
-const ground=BABYLON.MeshBuilder.CreateGround('ground',{width:100,height:100,subdivisions:2},scene);
+let ground=BABYLON.MeshBuilder.CreateGround('ground',{width:TERR.w,height:TERR.d,subdivisions:2},scene);
 const asphalt=new BABYLON.DynamicTexture('asphaltTex',{width:256,height:256},scene,true);
 const actx=asphalt.getContext();
 actx.fillStyle='rgb(34,34,34)';actx.fillRect(0,0,256,256);
@@ -414,37 +435,147 @@ for(let i=0;i<26;i++){
 }
 asphalt.update();
 asphalt.wrapU=asphalt.wrapV=BABYLON.Texture.WRAP_ADDRESSMODE;
-asphalt.uScale=25;asphalt.vScale=25;
+asphalt.uScale=TERR.w/4;asphalt.vScale=TERR.d/4;
 const groundMat=new BABYLON.StandardMaterial('gmat',scene);
 groundMat.diffuseColor=new BABYLON.Color3(0.9,0.9,0.9);
 groundMat.diffuseTexture=asphalt;
 groundMat.diffuseTexture.level=1;
 groundMat.specularColor=new BABYLON.Color3(0,0,0);
 ground.material=groundMat;ground.receiveShadows=true;
-const worldGround=BABYLON.MeshBuilder.CreateGround('worldGround',{width:8000,height:8000,subdivisions:12},scene);
-const worldMat=new BABYLON.StandardMaterial('wgmat',scene);
-worldMat.diffuseColor=new BABYLON.Color3(0.20,0.40,0.18);worldMat.specularColor=new BABYLON.Color3(0,0,0);
-worldGround.material=worldMat;worldGround.position.y=-0.02;worldGround.isPickable=false;
 
-// ── бордюр по периметру площадки ────────────────────────────
+// ── фоновый город вокруг территории (кварталы, улицы, этажность) ──
+const CITY_HALF=1000,BLOCK=72,STREET=26,PITCH=BLOCK+STREET;
+function hash2(x,z){let h=Math.imul(x,374761393)+Math.imul(z,668265263)|0;
+  h=Math.imul(h^(h>>>13),1274126177);return((h^(h>>>16))>>>0)/4294967295;}
+function vnoise(x,z){const ix=Math.floor(x),iz=Math.floor(z),fx=x-ix,fz=z-iz;
+  const s=t=>t*t*(3-2*t),u=s(fx),v=s(fz);
+  const a=hash2(ix,iz),b=hash2(ix+1,iz),c=hash2(ix,iz+1),d=hash2(ix+1,iz+1);
+  return a+(b-a)*u+(c-a)*v+(a-b-c+d)*u*v;}
+// расположение без произвольных вращений, но с ними надо осторожно
+const cityGround=BABYLON.MeshBuilder.CreateGround('cityGround',{width:CITY_HALF*2,height:CITY_HALF*2},scene);
+const cityTex=new BABYLON.DynamicTexture('cityTex',{width:1024,height:1024},scene,false);
+const cctx=cityTex.getContext();
+const pxm=m=>m*1024/(CITY_HALF*2);
+cctx.fillStyle='#26282d';cctx.fillRect(0,0,1024,1024);
+for(let i=0;i<140;i++){
+  const x=Math.random()*1024,y=Math.random()*1024,r=2+Math.random()*8,v=42+Math.random()*38;
+  cctx.fillStyle='rgba('+v+','+v+','+v+',0.5)';
+  cctx.beginPath();cctx.arc(x,y,r,0,Math.PI*2);cctx.fill();
+}
+cctx.strokeStyle='#3d434b';cctx.lineWidth=Math.max(2,pxm(STREET));
+for(let t=0;t<CITY_HALF;t+=PITCH){
+  const p=pxm(t)+pxm(STREET)/2;
+  cctx.beginPath();cctx.moveTo(pxm(-CITY_HALF),p);cctx.lineTo(pxm(CITY_HALF),p);cctx.stroke();
+  cctx.beginPath();cctx.moveTo(p,pxm(-CITY_HALF));cctx.lineTo(p,pxm(CITY_HALF));cctx.stroke();
+}
+cityTex.update();
+cityTex.wrapU=cityTex.wrapV=BABYLON.Texture.WRAP_ADDRESSMODE;
+const cityGroundMat=new BABYLON.StandardMaterial('cgmat',scene);
+cityGroundMat.diffuseColor=new BABYLON.Color3(1,1,1);
+cityGroundMat.diffuseTexture=cityTex;
+cityGroundMat.diffuseTexture.level=1;
+cityGroundMat.specularColor=new BABYLON.Color3(0,0,0);
+cityGround.material=cityGroundMat;cityGround.position.y=-0.05;cityGround.isPickable=false;
+let buildings=[];
+const cityMatPool=[[0.58,0.60,0.64],[0.66,0.64,0.60],[0.50,0.54,0.60],[0.62,0.57,0.53],[0.56,0.60,0.64],[0.70,0.71,0.72],
+  [0.44,0.48,0.54],[0.60,0.62,0.58]]
+  .map((c,i)=>{const m=new BABYLON.StandardMaterial('bmat'+i,scene);
+    m.diffuseColor=new BABYLON.Color3(c[0],c[1],c[2]);
+    m.specularColor=new BABYLON.Color3(0.12,0.12,0.12);m.specularPower=16;
+    m.backFaceCulling=true;return m;});
+const winMat=new BABYLON.StandardMaterial('winMat',scene);
+winMat.diffuseColor=new BABYLON.Color3(0.70,0.80,0.92);
+winMat.emissiveColor=new BABYLON.Color3(0.25,0.35,0.50);
+winMat.emissiveIntensity=0.9;
+winMat.specularColor=new BABYLON.Color3(0,0,0);
+winMat.backFaceCulling=false;
+function makeTree(x,z){const n=new BABYLON.TransformNode('tree',scene);
+  const trunk=BABYLON.MeshBuilder.CreateCylinder('tr',{diameter:0.4,height:2.4,segments:6},scene);
+  trunk.parent=n;trunk.position.y=1.2;trunk.material=trunkMat;
+  const crown=BABYLON.MeshBuilder.CreateSphere('cr',{diameter:4.2,segments:8},scene);
+  crown.parent=n;crown.position.y=3.8;crown.material=foliageMat;
+  n.position.set(x,0,z);n.isPickable=false;return n;}
+const trunkMat=new BABYLON.StandardMaterial('trunkMat',scene);
+trunkMat.diffuseColor=new BABYLON.Color3(0.35,0.26,0.16);trunkMat.specularColor=new BABYLON.Color3(0,0,0);
+const foliageMat=new BABYLON.StandardMaterial('folMat',scene);
+foliageMat.diffuseColor=new BABYLON.Color3(0.22,0.42,0.20);foliageMat.specularColor=new BABYLON.Color3(0,0,0);
+function buildCity(){
+  buildings.forEach(b=>{try{b.dispose();}catch(e){}});
+  buildings=[];
+  const hw=TERR.w/2,hd=TERR.d/2;
+  const minDist=Math.max(hw,hd)+70;
+  const maxOut=620;
+  const NN=Math.ceil((minDist+maxOut)/PITCH);
+  const rnd=(a,b)=>a+Math.random()*(b-a);
+  const dens=isMobile?0.7:1;
+  const floorH=3.6;
+  for(let iz=-NN;iz<=NN;iz++){
+    for(let ix=-NN;ix<=NN;ix++){
+      const bx=ix*PITCH+PITCH/2,bz=iz*PITCH+PITCH/2;
+      const dist=Math.hypot(bx,bz);
+      if(dist-BLOCK*0.71/2<minDist)continue;
+      if(dist-BLOCK*0.71/2>maxOut)continue;
+      const district=vnoise(bx*0.006+7.3,bz*0.006+2.1);
+      const park=vnoise(bx*0.013+4.7,bz*0.013+9.2);
+      if(park>0.90){ // парковый квартал: деревья, без домов
+        if(Math.random()<dens*0.7){for(let i=0;i<4;i++)buildings.push(makeTree(bx+rnd(-BLOCK/2+4,BLOCK/2-4),bz+rnd(-BLOCK/2+4,BLOCK/2-4)));}
+        continue;}
+      let baseFloors;
+      if(district<0.3)baseFloors=2;
+      else if(district<0.55)baseFloors=5;
+      else if(district<0.8)baseFloors=9;
+      else baseFloors=15;
+      const perRows=Math.floor(district*8)%2; // лёгкая «волна» скверов внутри квартала
+      for(let sr=0;sr<2;sr++){
+        for(let sc=0;sc<2;sc++){
+          const cx=bx-BLOCK/4+sc*BLOCK/2,cz=bz-BLOCK/4+sr*BLOCK/2;
+          const cell=vnoise(cx*0.05+sr*31,cz*0.05+sc*57);
+          if(cell>0.78*dens){ // внутриквартальный двор без здания
+            if(Math.random()<dens*0.8)buildings.push(makeTree(cx+rnd(-3,3),cz+rnd(-3,3)));
+            continue;}
+          const floors=baseFloors+Math.round(rnd(0,baseFloors<4?3:5));
+          const h=floors*floorH;
+          const w=baseFloors>=15?rnd(18,24):rnd(24,31);
+          const d=baseFloors>=15?rnd(18,24):rnd(24,31);
+          const b=BABYLON.MeshBuilder.CreateBox('bld',{width:w,height:h,depth:d},scene);
+          b.position.set(cx+rnd(-0.8,0.8),h/2,cz+rnd(-0.8,0.8));
+          b.rotation.y=(Math.random()<0.5?0:Math.PI/2)+(Math.random()-0.5)*0.06;
+          b.material=cityMatPool[Math.floor(Math.random()*cityMatPool.length)];
+          b.isPickable=false;
+          buildings.push(b);
+        }
+      }
+    }
+  }
+}
+buildCity();
+
+// ── бордюр по периметру территории ─────────────────────────
 const curbMat=new BABYLON.StandardMaterial('curbMat',scene);
 curbMat.diffuseColor=new BABYLON.Color3(0.52,0.53,0.55);
 curbMat.specularColor=new BABYLON.Color3(0.25,0.25,0.25);
-const curbTh=0.34,curbH=0.17;
-const curbL=100+curbTh*2;
-const cOff=50+curbTh/2;
-const curbs=[
-  {w:curbL,h:curbH,d:curbTh,p:new BABYLON.Vector3(0,0,cOff)},
-  {w:curbL,h:curbH,d:curbTh,p:new BABYLON.Vector3(0,0,-cOff)},
-  {w:curbTh,h:curbH,d:curbL,p:new BABYLON.Vector3(cOff,0,0)},
-  {w:curbTh,h:curbH,d:curbL,p:new BABYLON.Vector3(-cOff,0,0)}];
-curbs.forEach((c,i)=>{
-  const box=BABYLON.MeshBuilder.CreateBox('curb'+i,{width:c.w,height:c.h,depth:c.d},scene);
-  box.position.copyFrom(c.p);box.position.y=c.h/2;
-  box.material=curbMat;box.isPickable=false;box.receiveShadows=true;});
+let curbMeshes=[];
+function buildCurbs(){
+  curbMeshes.forEach(m=>{try{m.dispose();}catch(e){}});
+  curbMeshes=[];
+  const hw=TERR.w/2,hd=TERR.d/2;
+  const cLw=TERR.w+CURB_TH*2,cLd=TERR.d+CURB_TH*2;
+  const cOff=hw+CURB_TH/2;
+  const cOff2=hd+CURB_TH/2;
+  const defs=[
+    {w:cLw,h:CURB_H,d:CURB_TH,p:new BABYLON.Vector3(0,0,cOff2)},
+    {w:cLw,h:CURB_H,d:CURB_TH,p:new BABYLON.Vector3(0,0,-cOff2)},
+    {w:CURB_TH,h:CURB_H,d:cLd,p:new BABYLON.Vector3(cOff,0,0)},
+    {w:CURB_TH,h:CURB_H,d:cLd,p:new BABYLON.Vector3(-cOff,0,0)}];
+  defs.forEach((c,i)=>{
+    const box=BABYLON.MeshBuilder.CreateBox('curb'+i,{width:c.w,height:c.h,depth:c.d},scene);
+    box.position.copyFrom(c.p);box.position.y=c.h/2;
+    box.material=curbMat;box.isPickable=false;box.receiveShadows=true;
+    curbMeshes.push(box);});
+}
+buildCurbs();
 
-// ── забор вокруг площадки ───────────────────────────────────
-const fenceOff=0.65;
+// ── забор вокруг территории ────────────────────────────────
 const postMat=new BABYLON.StandardMaterial('postMat',scene);
 postMat.diffuseColor=new BABYLON.Color3(0.42,0.46,0.5);
 postMat.specularColor=new BABYLON.Color3(0.4,0.4,0.42);
@@ -453,39 +584,81 @@ const railMat=new BABYLON.StandardMaterial('railMat',scene);
 railMat.diffuseColor=new BABYLON.Color3(0.88,0.9,0.92);
 railMat.specularColor=new BABYLON.Color3(0.5,0.5,0.5);
 railMat.specularPower=128;
-function buildFence(side,posBase,axisFixed){
-  const start=-50,end=50,step=3.2;
-  const n=Math.floor((end-start)/step)+1;
-  for(let i=0;i<n;i++){
-    const t=start+(end-start)*(i/(n-1));
-    const post=BABYLON.MeshBuilder.CreateBox('fPost'+side+'_'+i,{width:0.08,height:1.7,depth:0.08},scene);
-    if(axisFixed==='x')post.position.set(posBase,0.85,t);
-    else post.position.set(t,0.85,posBase);
-    post.material=postMat;post.isPickable=false;
-  }
-  const railH=[0.8,1.5];
-  railH.forEach((h,j)=>{
-    const alongX=axisFixed==='x';
-    const rail=BABYLON.MeshBuilder.CreateBox('fRail'+side+'_'+j,
-      {width:alongX?102:0.06,height:0.06,depth:alongX?0.06:102},scene);
-    if(alongX)rail.position.set(0,h,posBase);
-    else rail.position.set(posBase,h,0);
-    rail.material=railMat;rail.isPickable=false;
+let fenceMeshes=[];
+function buildFenceAll(){
+  fenceMeshes.forEach(m=>{try{m.dispose();}catch(e){}});
+  fenceMeshes=[];
+  const hw=TERR.w/2,hd=TERR.d/2;
+  // стороны N/S идут вдоль X, E/W — вдоль Z
+  const sides=[
+    {id:'N',alongX:true ,posBase:hd+TERR_FENCE_OFF},
+    {id:'S',alongX:true ,posBase:-(hd+TERR_FENCE_OFF)},
+    {id:'E',alongX:false,posBase:hw+TERR_FENCE_OFF},
+    {id:'W',alongX:false,posBase:-(hw+TERR_FENCE_OFF)}];
+  sides.forEach(s=>{
+    const half=s.alongX?hw:hd;
+    const extent=s.alongX?TERR.w:TERR.d;
+    const n=Math.floor(extent/FENCE_STEP)+1;
+    for(let i=0;i<n;i++){
+      const t=-half+extent*(i/(n-1));
+      const post=BABYLON.MeshBuilder.CreateBox('fPost'+s.id+'_'+i,{width:0.08,height:1.7,depth:0.08},scene);
+      if(s.alongX)post.position.set(t,0.85,s.posBase);
+      else post.position.set(s.posBase,0.85,t);
+      post.material=postMat;post.isPickable=false;
+      fenceMeshes.push(post);
+    }
+    const railH=[0.8,1.5];
+    railH.forEach((h,j)=>{
+      const rail=BABYLON.MeshBuilder.CreateBox('fRail'+s.id+'_'+j,
+        {width:s.alongX?extent:0.06,height:0.06,depth:s.alongX?0.06:extent},scene);
+      if(s.alongX)rail.position.set(0,h,s.posBase);
+      else rail.position.set(s.posBase,h,0);
+      rail.material=railMat;rail.isPickable=false;
+      fenceMeshes.push(rail);
+    });
   });
 }
-buildFence('N',50+fenceOff,'x');
-buildFence('S',-(50+fenceOff),'x');
-buildFence('E',50+fenceOff,'z');
-buildFence('W',-(50+fenceOff),'z');
-function gridLines(step,half,y){const lines=[];for(let i=-half;i<=half+1e-6;i+=step){
-  lines.push([new BABYLON.Vector3(i,y,-half),new BABYLON.Vector3(i,y,half)]);
-  lines.push([new BABYLON.Vector3(-half,y,i),new BABYLON.Vector3(half,y,i)]);}return lines;}
-const grid=BABYLON.MeshBuilder.CreateLineSystem('grid',{lines:gridLines(0.5,50,0.01)},scene);
-grid.color=new BABYLON.Color3(0.30,0.30,0.30);grid.isPickable=false;grid.isVisible=false;
-const axes=BABYLON.MeshBuilder.CreateLineSystem('axes',{lines:[
-  [new BABYLON.Vector3(0,0.02,-50),new BABYLON.Vector3(0,0.02,50)],
-  [new BABYLON.Vector3(-50,0.02,0),new BABYLON.Vector3(50,0.02,0)]]},scene);
-axes.color=new BABYLON.Color3(0.55,0.55,0.55);axes.isPickable=false;axes.isVisible=false;
+buildFenceAll();
+
+// ── сетка и оси внутри территории ───────────────────────────
+function gridLines(step,halfX,halfZ,y){const lines=[];
+  for(let i=-halfX;i<=halfX+1e-6;i+=step){
+    lines.push([new BABYLON.Vector3(i,y,-halfZ),new BABYLON.Vector3(i,y,halfZ)]);}
+  for(let i=-halfZ;i<=halfZ+1e-6;i+=step){
+    lines.push([new BABYLON.Vector3(-halfX,y,i),new BABYLON.Vector3(halfX,y,i)]);}
+  return lines;}
+let grid=null,axes=null;
+function buildGridAxes(){
+  const hw=TERR.w/2,hd=TERR.d/2;
+  const vis=grid?grid.isVisible:false;
+  if(grid){grid.dispose();grid=null;}
+  if(axes){axes.dispose();axes=null;}
+  grid=BABYLON.MeshBuilder.CreateLineSystem('grid',{lines:gridLines(0.5,hw,hd,0.01)},scene);
+  grid.color=new BABYLON.Color3(0.30,0.30,0.30);grid.isPickable=false;grid.isVisible=vis;
+  axes=BABYLON.MeshBuilder.CreateLineSystem('axes',{lines:[
+    [new BABYLON.Vector3(0,0.02,-hd),new BABYLON.Vector3(0,0.02,hd)],
+    [new BABYLON.Vector3(-hw,0.02,0),new BABYLON.Vector3(hw,0.02,0)]]},scene);
+  axes.color=new BABYLON.Color3(0.55,0.55,0.55);axes.isPickable=false;axes.isVisible=vis;
+}
+buildGridAxes();
+
+// смена размера территории (полный пересбор) ─────────────────
+function rebuildTerritory(w,d){
+  TERR.w=Math.max(10,Math.min(400,Math.round(w||100)));
+  TERR.d=Math.max(10,Math.min(400,Math.round(d||100)));
+  ground.dispose();
+  ground=BABYLON.MeshBuilder.CreateGround('ground',{width:TERR.w,height:TERR.d,subdivisions:2},scene);
+  ground.material=groundMat;ground.receiveShadows=true;
+  asphalt.uScale=TERR.w/4;asphalt.vScale=TERR.d/4;
+  camera.upperRadiusLimit=Math.max(220,Math.max(TERR.w,TERR.d)*1.4);
+  buildCurbs();
+  buildFenceAll();
+  buildGridAxes();
+  buildCity();
+  if(typeof setTerritoryLimits==='function')setTerritoryLimits(TERR.w/2,TERR.d/2);
+  saveTerritory();
+  if(typeof updateMirrorRenderList==='function')updateMirrorRenderList();
+}
 
 // ── машина ─────────────────────────────────────────────
 let car=null,steerPivots=[],spinPivots=[],primitiveRoot=null,modelCarRoot=null;
@@ -1042,8 +1215,9 @@ function updateCar(dt){
   heading+=(speed/CAR.wheelbase)*Math.tan(steerAngle)*dt;
   const s1=Math.sin(heading),c1=Math.cos(heading);
   const rz=rearAxleOffset();
-  car.position.x=Math.max(-48,Math.min(48,car.position.x+rz*s0+s0*speed*dt-rz*s1));
-  car.position.z=Math.max(-48,Math.min(48,car.position.z+rz*c0+c0*speed*dt-rz*c1));
+  const limX=TERR.w/2-2,limZ=TERR.d/2-2;
+  car.position.x=Math.max(-limX,Math.min(limX,car.position.x+rz*s0+s0*speed*dt-rz*s1));
+  car.position.z=Math.max(-limZ,Math.min(limZ,car.position.z+rz*c0+c0*speed*dt-rz*c1));
   car.rotation.y=heading;
   const roll=speed*dt;
   spinPivots.forEach(sp=>sp.node.rotation.x+=roll/sp.radius);
@@ -1138,6 +1312,13 @@ function openMapEdit(o){
 mapBtn.addEventListener('click',()=>{
   openSettings(false);
   openMapEdit(true);
+});
+const terrWEl=document.getElementById('terrW'),terrDEl=document.getElementById('terrD');
+function syncTerrInputs(){if(terrWEl)terrWEl.value=TERR.w;if(terrDEl)terrDEl.value=TERR.d;}
+syncTerrInputs();
+if(document.getElementById('applyTerr'))document.getElementById('applyTerr').addEventListener('click',()=>{
+  rebuildTerritory(parseFloat(terrWEl.value),parseFloat(terrDEl.value));
+  syncTerrInputs();
 });
 document.getElementById('mapDone').addEventListener('click',()=>openMapEdit(false));
 function closeAllWindows(){openSettings(false);openMapEdit(false);}

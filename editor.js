@@ -11,8 +11,12 @@
  *     которые главный скрипт использует из обработчиков клавиш и цикла рендера.
  */
 
-const STEP=0.25,HALF=50;
-const snap=v=>Math.max(-HALF,Math.min(HALF,Math.round(v/STEP)*STEP));
+const STEP=0.25;
+let HALFX=(typeof TERR!=='undefined'&&TERR)?TERR.w/2:50;
+let HALFZ=(typeof TERR!=='undefined'&&TERR)?TERR.d/2:50;
+const snapX=v=>Math.max(-HALFX,Math.min(HALFX,Math.round(v/STEP)*STEP));
+const snapZ=v=>Math.max(-HALFZ,Math.min(HALFZ,Math.round(v/STEP)*STEP));
+function setTerritoryLimits(hw,hd){HALFX=hw;HALFZ=hd;}
 const key=(x,z)=>`${x.toFixed(2)},${z.toFixed(2)}`;
 const coneNodes=[];const occupied=new Set();const countEl=document.getElementById('count');
 const baseMat=new BABYLON.StandardMaterial('bm',scene);baseMat.diffuseColor=new BABYLON.Color3(0.85,0.26,0.08);baseMat.specularColor=new BABYLON.Color3(0,0,0);
@@ -82,7 +86,7 @@ function updateLinePreview(){
   const last=openLine.pts[openLine.pts.length-1];
   const p=pickGround();
   if(p.hit&&last){
-    const sx=snap(p.pickedPoint.x),sz=snap(p.pickedPoint.z);
+    const sx=snapX(p.pickedPoint.x),sz=snapZ(p.pickedPoint.z);
     const dx=sx-last[0],dz=sz-last[1];
     const L=Math.hypot(dx,dz);
     if(L>1e-4){
@@ -248,7 +252,7 @@ scene.onPointerObservable.add(pi=>{const t=pi.type;
   if(!conesEnabled)return;
   if(t===BABYLON.PointerEventTypes.POINTERMOVE){
     const p=pickGround();
-    if(p.hit){const sx=snap(p.pickedPoint.x),sz=snap(p.pickedPoint.z);
+    if(p.hit){const sx=snapX(p.pickedPoint.x),sz=snapZ(p.pickedPoint.z);
       preview.position.set(sx,0.05,sz);preview.isVisible=(mode==='place')||!!dragging||mode==='lines';
       if(dragging)dragging.position.set(sx,0,sz);}
     else if(!dragging){preview.isVisible=false;hideLinePreview();}
@@ -262,7 +266,7 @@ scene.onPointerObservable.add(pi=>{const t=pi.type;
         dragOldKey=ud.cellKey;occupied.delete(dragOldKey);
         camera.detachControl();canvas.style.cursor='grabbing';}}}
   else if(t===BABYLON.PointerEventTypes.POINTERUP){
-    if(dragging){const x=snap(dragging.position.x),z=snap(dragging.position.z),k=key(x,z);
+    if(dragging){const x=snapX(dragging.position.x),z=snapZ(dragging.position.z),k=key(x,z);
       const ud=dragging.userData;
       if(occupied.has(k)){const[ox,oz]=dragOldKey.split(',').map(Number);
         dragging.position.set(ox,0,oz);occupied.add(dragOldKey);ud.cellKey=dragOldKey;}
@@ -275,8 +279,8 @@ scene.onPointerObservable.add(pi=>{const t=pi.type;
       const c=pickCone();if(c.hit)deleteCone(c.pickedMesh.parent);
       else{const l=pickLine();if(l.hit)deletePolylineFromMesh(l.pickedMesh);}
     }
-    else if(mode==='place'){const p=pickGround();if(p.hit)addConeAt(snap(p.pickedPoint.x),snap(p.pickedPoint.z));}
-    else if(mode==='lines'){const p=pickGround();if(p.hit)addLinePoint(snap(p.pickedPoint.x),snap(p.pickedPoint.z));}}});
+    else if(mode==='place'){const p=pickGround();if(p.hit)addConeAt(snapX(p.pickedPoint.x),snapZ(p.pickedPoint.z));}
+    else if(mode==='lines'){const p=pickGround();if(p.hit)addLinePoint(snapX(p.pickedPoint.x),snapZ(p.pickedPoint.z));}}});
 
 setMode('place');
 loadCones();
