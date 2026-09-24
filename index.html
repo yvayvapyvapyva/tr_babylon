@@ -106,27 +106,29 @@
   #resetMirrors:hover{border-color:#62d0df;color:#62d0df}
   .mirror-keys{color:#7c93a4;font-size:10px;margin-top:4px;line-height:1.4}
   .mirror-keys b{color:#9db4c4}
-  @media (max-width:640px){
+  @media (max-width:640px),(pointer:coarse){
     #gearBtn{left:10px;top:10px;width:48px;height:48px;border-radius:12px}
     #gearBtn svg{width:26px;height:26px}
-    #mapBtn{min-height:48px;font-size:13px;border-radius:10px}
+    #mapBtn{min-height:48px;font-size:14px;border-radius:10px}
     #mapBtn svg{width:20px;height:20px}
-    #settingsWin{width:94vw;max-height:calc(100vh - 20px);font:14px/1.5 system-ui,sans-serif;border-radius:14px}
-    .sw-head{padding:14px}
-    .sw-body{padding:14px}
-    #clear,#cabBtn,#camFollowBtn,#resetMirrors,.modes button{min-height:46px;font-size:13px;padding:10px 6px}
-    .sw-close{width:38px;height:38px;font-size:17px}
+    #settingsWin{width:min(94vw,560px);max-height:calc(100vh - 40px);font:15px/1.55 system-ui,sans-serif;border-radius:14px}
+    .sw-head{padding:16px 18px}
+    .sw-title{font-size:17px}
+    .sw-close{width:42px;height:42px;font-size:18px}
+    .sw-body{padding:18px}
+    .sw-sec h3{font-size:12.5px;margin-bottom:11px}
+    #clear,#cabBtn,#camFollowBtn,#resetMirrors,.modes button{min-height:48px;font-size:14px;padding:10px 8px}
     .modes{gap:8px}
-    #mapEdit{font-size:14px;padding:12px 14px calc(12px + env(safe-area-inset-bottom,0px))}
-    #mapEdit .me-modes button{min-height:50px;font-size:14px}
-    #mapEdit .me-done,#mapEdit .me-clear{min-height:44px;font-size:13px;padding:8px 16px}
-    #mapEdit .me-hint{font-size:13.5px}
-    .mirror-row{margin-bottom:10px}
-    .mirror-row input[type=range]{min-height:30px;touch-action:auto}
-    .mirror-row label{width:64px;font-size:12px}
-    .mirror-row .val{width:42px;font-size:12px}
-    .mirror-keys,.drive,.tele,.count,#hintline{font-size:12.5px}
-    .cone-toggle{font-size:13.5px;padding:4px 0;margin-bottom:10px}
+    #mapEdit{font-size:15px;padding:14px 14px calc(14px + env(safe-area-inset-bottom,0px))}
+    #mapEdit .me-modes button{min-height:52px;font-size:15px}
+    #mapEdit .me-done,#mapEdit .me-clear{min-height:46px;font-size:14px;padding:8px 16px}
+    #mapEdit .me-hint{font-size:14.5px}
+    .mirror-row{margin-bottom:12px}
+    .mirror-row input[type=range]{min-height:32px;touch-action:auto}
+    .mirror-row label{width:72px;font-size:13px}
+    .mirror-row .val{width:46px;font-size:13px}
+    .mirror-keys,.drive,.tele,.count,#hintline{font-size:13.5px}
+    .cone-toggle{font-size:14.5px;padding:4px 0;margin-bottom:10px}
     .cone-toggle input{width:20px;height:20px}
   }
 </style>
