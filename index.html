@@ -90,11 +90,11 @@
   .drive b{color:#9db4c4}
   .tele{color:#9db4c4;font-size:12px;margin-bottom:10px}
   .tele b{color:#62d0df}
-  #clear,#cabBtn{width:100%;padding:6px 0;background:#1c2c3a;color:#9db4c4;
+  #clear,#cabBtn,#camFollowBtn{width:100%;padding:6px 0;background:#1c2c3a;color:#9db4c4;
     border:1px solid #2a4257;border-radius:8px;font:600 11px/1 inherit;cursor:pointer}
-  #cabBtn{margin-top:6px}
+  #cabBtn,#camFollowBtn{margin-top:6px}
   #clear:hover{border-color:#e05e4a;color:#e05e4a}
-  #cabBtn:hover,#cabBtn.active{border-color:#62d0df;color:#62d0df}
+  #cabBtn:hover,#cabBtn.active,#camFollowBtn:hover,#camFollowBtn.active{border-color:#62d0df;color:#62d0df}
   .mirror-ctrl{margin-top:2px}
   .mirror-row{display:flex;align-items:center;gap:6px;margin-bottom:6px;font-size:11px}
   .mirror-row label{width:50px;color:#7c93a4}
@@ -114,7 +114,7 @@
     #settingsWin{width:94vw;max-height:calc(100vh - 20px);font:14px/1.5 system-ui,sans-serif;border-radius:14px}
     .sw-head{padding:14px}
     .sw-body{padding:14px}
-    #clear,#cabBtn,#resetMirrors,.modes button{min-height:46px;font-size:13px;padding:10px 6px}
+    #clear,#cabBtn,#camFollowBtn,#resetMirrors,.modes button{min-height:46px;font-size:13px;padding:10px 6px}
     .sw-close{width:38px;height:38px;font-size:17px}
     .modes{gap:8px}
     #mapEdit{font-size:14px;padding:12px 14px calc(12px + env(safe-area-inset-bottom,0px))}
@@ -252,6 +252,7 @@
       <div class="tele">Скорость: <b id="spd">0</b> км/ч · Руль: <b id="str">0°</b></div>
       <div class="tele" id="blinkdbg">Q/E: поворотники (инициализация…)</div>
       <button id="cabBtn">Обзор: кабина (V)</button>
+      <button id="camFollowBtn">Автоповорот камеры: вкл (F)</button>
     </div>
 
     <div class="sw-sec">
@@ -371,6 +372,7 @@ axes.color=new BABYLON.Color3(0.55,0.55,0.55);axes.isPickable=false;
 // ── машина ─────────────────────────────────────────────
 let car=null,steerPivots=[],spinPivots=[],primitiveRoot=null,modelCarRoot=null;
 let cabMode=false;const cabMats=new Map();
+let camFollow=true;
 let headYaw=0,headPitch=0,headTurn=false;
 let carHeight=CAR.height;
 let steeringWheelNode=null,steeringBaseQuat=null,steeringLocalAxis=null,blinkTimer=0;
@@ -789,6 +791,15 @@ function setCabMode(b){
 }
 cabBtn.addEventListener('click',()=>setCabMode(!cabMode));
 
+let camFollowBtn=document.getElementById('camFollowBtn');
+function syncCamFollowBtn(){
+  if(!camFollowBtn)return;
+  camFollowBtn.textContent='Автоповорот камеры: '+(camFollow?'вкл (F)':'выкл (F)');
+  camFollowBtn.classList.toggle('active',camFollow);
+}
+camFollowBtn.addEventListener('click',()=>{camFollow=!camFollow;syncCamFollowBtn();});
+syncCamFollowBtn();
+
 canvas.addEventListener('pointerdown',e=>{
   if(pickMode){
     const r=canvas.getBoundingClientRect();
@@ -852,6 +863,7 @@ addEventListener('keydown',e=>{
   else if(e.code==='Digit3')setMode('delete');
   else if(e.code==='KeyC')clearCones();
   else if(e.code==='KeyV')setCabMode(!cabMode);
+  else if(e.code==='KeyF'){camFollow=!camFollow;syncCamFollowBtn();}
   else if(e.code==='KeyP'){pickMode=!pickMode;
     const h=document.getElementById('hintline');
     if(h)h.textContent=pickMode?'РЕЖИМ ВЫБОРА: кликни по нужной секции фары':'Клик по площадке — поставить конус (шаг 0,25 м)';}
@@ -939,7 +951,7 @@ function updateCar(dt){
 function lerpAngle(a,b,t){let d=(b-a)%(Math.PI*2);if(d>Math.PI)d-=Math.PI*2;if(d<-Math.PI)d+=Math.PI*2;return a+d*t;}
 function updateCamera(){const t=camera.target;
   t.x+=(car.position.x-t.x)*0.12;t.y+=((car.position.y+1.2)-t.y)*0.12;t.z+=(car.position.z-t.z)*0.12;
-  if(Math.abs(speed)>0.5){const desired=Math.atan2(-Math.cos(heading),-Math.sin(heading));
+  if(camFollow&&!cabMode&&Math.abs(speed)>0.5){const desired=Math.atan2(-Math.cos(heading),-Math.sin(heading));
     camera.alpha=lerpAngle(camera.alpha,desired,0.06);}}
 
 scene.onBeforeRenderObservable.add(()=>{
