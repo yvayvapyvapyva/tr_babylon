@@ -233,6 +233,7 @@ function setupMirrorReflections(modelRoot){
     // Планарное отражение (MirrorTexture) — идеально ровное зеркало без искажений
     const tex = new BABYLON.MirrorTexture(name + "_mirrorTex", MIRROR_SIZE, scene, true);
     tex.renderList = mirrorRenderFilter();
+    tex.refreshRate = 2;
     const localN = mirrorSurfaceNormalLocal(mesh);
     
     // Оси регулировки в системе координат родителя зеркала:
@@ -294,6 +295,7 @@ function setMirrorQuality(size){
   mirrorEntries.forEach(en=>{
     const tex=new BABYLON.MirrorTexture(en.key+'_mirrorTex',size,scene,true);
     tex.renderList=mirrorRenderFilter();
+    tex.refreshRate=2;
     en.tex=tex;
     if(en.mat){if(mirrorsActive){en.mat.reflectionTexture=tex;en.mat.reflectionTexture.level=1.0;}else en.mat.reflectionTexture=null;}
     if(en.key==='left')leftMirrorTex=tex;
