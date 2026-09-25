@@ -327,6 +327,7 @@ document.addEventListener('pointerdown',tgFullscreen,{once:true});
       <option value="lines">Разметка</option>
       <option value="curb">Бордюр</option>
       <option value="fence">Забор</option>
+      <option value="estacada">Эстакада</option>
     </select>
     <button class="me-type-thumb" id="editTypeBtn" aria-label="Выбрать объект">
       <span class="tv-wrap me-type-wrap">
@@ -481,7 +482,7 @@ document.addEventListener('pointerdown',tgFullscreen,{once:true});
     <button class="sw-close" id="mapCfgClose" aria-label="Закрыть">✕</button>
   </div>
   <div class="sw-body">
-    <div class="me-count" style="margin-bottom:10px">Конусов: <b id="count">0</b> · Линий: <b id="countLines">0</b> · Бордюров: <b id="countCurb">0</b> · Заборов: <b id="countFence">0</b></div>
+    <div class="me-count" style="margin-bottom:10px">Конусов: <b id="count">0</b> · Линий: <b id="countLines">0</b> · Бордюров: <b id="countCurb">0</b> · Заборов: <b id="countFence">0</b> · Эстакад: <b id="countEstacada">0</b></div>
     <div class="me-terr">
       <span class="me-terr-label">Размер территории (Ш × Д), м</span>
       <input type="number" id="terrW" min="10" max="400" step="5" value="100">
@@ -533,6 +534,13 @@ document.addEventListener('pointerdown',tgFullscreen,{once:true});
         <span class="t-ico tg-fallback"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="14" y="5" width="2" height="16" rx=".6" fill="#6a7075" stroke="#22303a" stroke-width=".8"/><rect x="18.5" y="5" width="2" height="16" rx=".6" fill="#6a7075" stroke="#22303a" stroke-width=".8"/><rect x="3" y="7" width="17.4" height="1.8" rx=".9" fill="#f2f4f6" stroke="#22303a" stroke-width=".7"/><rect x="3" y="14" width="17.4" height="1.8" rx=".9" fill="#f2f4f6" stroke="#22303a" stroke-width=".7"/></svg></span>
       </div>
       <span class="tg-lbl">Забор</span>
+    </button>
+    <button class="tg-card" data-type="estacada">
+      <div class="tv-wrap">
+        <canvas class="tg-canvas" width="140" height="140"></canvas>
+        <span class="t-ico tg-fallback"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2.8 18.5 7.5 11h9l4.7 7.5" fill="none" stroke="#9db4c4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><line x1="2.8" y1="18.5" x2="21.2" y2="18.5" stroke="#7c93a4" stroke-width="1.6"/></svg></span>
+      </div>
+      <span class="tg-lbl">Эстакада</span>
     </button>
   </div>
 </div>
@@ -1319,6 +1327,15 @@ addEventListener('keydown',e=>{
 addEventListener('keyup',e=>{const a=keyMap[e.code];if(a!==undefined)keys[a]=false;});
 
 let speed=0,heading=0,steerAngle=0;
+const GRAV_G=9.81,GRAV_SCL=0.9,ENG_ACC=3.4,DRAG_K=0.5,BRAKE_A=13,STATIC_HOLD=2.2;
+let engineT=0,carSlopeF=0;
+function accelModel(t,sb,g,b){
+  let a=t*ENG_ACC;
+  a-=DRAG_K*sb;
+  a-=GRAV_G*GRAV_SCL*g;
+  if(b)a-=Math.sign(sb)*BRAKE_A;
+  return a;
+}
 const spdEl=document.getElementById('spd'),strEl=document.getElementById('str');
 function rearAxleOffset(){
   const zs=spinPivots.map(p=>p.node.position.z).filter(z=>z<0);
@@ -1329,10 +1346,10 @@ function updateCar(dt){
   if(keys.forward)throttle+=1;if(keys.back)throttle-=1;
   if(keys.left)steerInput-=1;if(keys.right)steerInput+=1;
   const MAXV=8/3.6;
-  let tgt=throttle>0?MAXV:throttle<0?-MAXV:0;
-  if(keys.brake)tgt=0;
-  const tau=keys.brake?0.1:0.35;
-  speed+=(tgt-speed)*(1-Math.exp(-dt/tau));
+  engineT+=(throttle-engineT)*(1-Math.exp(-dt/0.18));
+  if(keys.brake&&Math.abs(speed)<0.06){speed=0;}
+  else if(Math.abs(engineT)<0.02&&Math.abs(speed)<0.06&&Math.abs(GRAV_G*GRAV_SCL*carSlopeF)<STATIC_HOLD){speed=0;}
+  else speed+=accelModel(engineT,speed,carSlopeF,keys.brake)*dt;
   speed=Math.max(-MAXV,Math.min(MAXV,speed));
   const touchActive=touchSteerEnabled&&!keys.left&&!keys.right;
   const target=touchActive?touchSteerAngle:steerInput*CAR.maxSteer;
@@ -1345,9 +1362,21 @@ function updateCar(dt){
   const s1=Math.sin(heading),c1=Math.cos(heading);
   const rz=rearAxleOffset();
   const limX=TERR.w/2-2,limZ=TERR.d/2-2;
-  car.position.x=Math.max(-limX,Math.min(limX,car.position.x+rz*s0+s0*speed*dt-rz*s1));
-  car.position.z=Math.max(-limZ,Math.min(limZ,car.position.z+rz*c0+c0*speed*dt-rz*c1));
-  car.rotation.y=heading;
+  const px0=car.position.x,pz0=car.position.z;
+  let nx=Math.max(-limX,Math.min(limX,px0+rz*s0+s0*speed*dt-rz*s1));
+  let nz=Math.max(-limZ,Math.min(limZ,pz0+rz*c0+c0*speed*dt-rz*c1));
+  const dxmove=nx-px0,dzmove=nz-pz0;
+  if(typeof carBlocked==='function'&&(dxmove!==0||dzmove!==0)){
+    const hit=(xq,zq)=>carBlocked(xq,zq,car.position.y,dxmove,dzmove,c1,s1);
+    if(hit(nx,nz)){
+      if(!hit(nx,pz0))nz=pz0;
+      else if(!hit(px0,nz))nx=px0;
+      else{nx=px0;nz=pz0;}
+    }
+  }
+  car.position.x=nx;
+  car.position.z=nz;
+  rideTerrain();
   const roll=speed*dt;
   spinPivots.forEach(sp=>sp.node.rotation.x+=roll/sp.radius);
   steerPivots.forEach(s=>s.rotation.y=steerAngle);
@@ -1370,6 +1399,26 @@ function updateCar(dt){
   spdEl.textContent=Math.round(Math.abs(speed)*3.6);
   const deg=Math.round(steerAngle*180/Math.PI);
   strEl.textContent=(deg<0?'← ':deg>0?'→ ':'')+Math.abs(deg)+'°';
+}
+const CAR_RAYS=[[-0.7,-1.35],[0.7,-1.35],[-0.7,1.45],[0.7,1.45]]; // [lateral, longitudinal] contact points
+function rideTerrain(){
+  if(!scene||!ground)return;
+  const cs=Math.cos(heading),sn=Math.sin(heading);
+  const hts=[];
+  for(let i=0;i<CAR_RAYS.length;i++){
+    const lo=CAR_RAYS[i][0],lg=CAR_RAYS[i][1];
+    const wx=car.position.x+lo*cs+lg*sn;
+    const wz=car.position.z-lo*sn+lg*cs;
+    const ray=new BABYLON.Ray(new BABYLON.Vector3(wx,car.position.y+2,wz),new BABYLON.Vector3(0,-1,0),6);
+    const pi=scene.pickWithRay(ray,m=>m&&(m===ground||(m.metadata&&m.metadata.stype==='estacada')));
+    hts.push(pi&&pi.hit?pi.pickedPoint.y:0);
+  }
+  const rl=hts[0],rr=hts[1],fl=hts[2],fr=hts[3];
+  car.position.y=(rl+rr+fl+fr)/4;
+  carSlopeF=((fl+fr)-(rl+rr))/(2*2.8);
+  const pitch=Math.atan2((rl+rr-fl-fr)/2,2.8);
+  const roll=Math.atan2((fr+rr-fl-rl)/2,1.4);
+  car.rotationQuaternion=BABYLON.Quaternion.RotationYawPitchRoll(heading,pitch,roll);
 }
 function lerpAngle(a,b,t){let d=(b-a)%(Math.PI*2);if(d>Math.PI)d-=Math.PI*2;if(d<-Math.PI)d+=Math.PI*2;return a+d*t;}
 function updateCamera(){

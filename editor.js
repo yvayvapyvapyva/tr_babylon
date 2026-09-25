@@ -52,15 +52,17 @@ function loadCones(){try{const data=JSON.parse(localStorage.getItem(STORE_KEY)||
   if(Array.isArray(data))data.forEach(([x,z])=>{if(typeof x==='number'&&typeof z==='number')addConeAt(x,z);});}catch(e){}}
 
 // ── Рисование линиями: разметка / бордюр / забор ──────────────
-const DRAW_TYPES=['lines','curb','fence'];
-const LINE_KEY={lines:'tr_babylon_markings',curb:'tr_babylon_curbs',fence:'tr_babylon_fences'};
+const DRAW_TYPES=['lines','curb','fence','estacada'];
+const LINE_KEY={lines:'tr_babylon_markings',curb:'tr_babylon_curbs',fence:'tr_babylon_fences',estacada:'tr_babylon_estacadas'};
 const LINE_WIDTH={lines:0.1,curb:0.25,fence:0.05};
 const LINE_H={lines:0.006,curb:0.30,fence:1.7};
 const LINE_Y={lines:0.0042,curb:0.15,fence:0.85};
 let drawSeq=0;
+const EST_SLOPE=0.16,EST_L2=5,EST_W=4;
 const countLinesEl=document.getElementById('countLines');
 const countCurbEl=document.getElementById('countCurb');
 const countFenceEl=document.getElementById('countFence');
+const countEstacadaEl=document.getElementById('countEstacada');
 const finishLineBtn=document.getElementById('finishLineBtn');
 const lineMat=new BABYLON.StandardMaterial('lm',scene);
 lineMat.diffuseColor=new BABYLON.Color3(1,1,1);
@@ -76,6 +78,37 @@ const fenceRailMat=new BABYLON.StandardMaterial('frm',scene);
 fenceRailMat.diffuseColor=new BABYLON.Color3(0.88,0.9,0.92);
 fenceRailMat.specularColor=new BABYLON.Color3(0.5,0.5,0.5);
 fenceRailMat.specularPower=128;
+const estacadaMat=new BABYLON.StandardMaterial('em',scene);
+estacadaMat.diffuseColor=new BABYLON.Color3(0.92,0.92,0.93);
+estacadaMat.specularColor=new BABYLON.Color3(0.06,0.06,0.08);
+estacadaMat.specularPower=16;
+estacadaMat.backFaceCulling=false;
+const estTex=new BABYLON.DynamicTexture('estTex',{width:256,height:256},scene,true);
+const etx=estTex.getContext();
+etx.fillStyle='rgb(62,62,64)';etx.fillRect(0,0,256,256);
+for(let i=0;i<7000;i++){
+  const x=Math.random()*256,y=Math.random()*256,v=64+(Math.random()*26-13);
+  etx.fillStyle='rgb('+v+','+v+','+v+')';etx.fillRect(x,y,1,1);
+}
+for(let i=0;i<110;i++){
+  const x=Math.random()*256,y=Math.random()*256,r=1.5+Math.random()*4,v=66+(Math.random()*22-11);
+  etx.fillStyle='rgba('+v+','+v+','+v+',0.4)';
+  etx.beginPath();etx.arc(x,y,r,0,Math.PI*2);etx.fill();
+}
+for(let i=0;i<20;i++){
+  const x=Math.random()*256,y=Math.random()*256,l=12+Math.random()*34,a=Math.random()*Math.PI;
+  etx.strokeStyle='rgba(18,18,18,0.35)';etx.lineWidth=1;
+  etx.beginPath();etx.moveTo(x,y);etx.lineTo(x+Math.cos(a)*l,y+Math.sin(a)*l);etx.stroke();
+}
+estTex.update();
+estTex.wrapU=estTex.wrapV=BABYLON.Texture.WRAP_ADDRESSMODE;
+estacadaMat.diffuseTexture=estTex;
+estacadaMat.diffuseTexture.level=1;
+const rampPrevMat=new BABYLON.StandardMaterial('rpm',scene);
+rampPrevMat.diffuseColor=new BABYLON.Color3(0.8,0.9,1);
+rampPrevMat.alpha=0.5;
+rampPrevMat.specularColor=new BABYLON.Color3(0,0,0);
+rampPrevMat.backFaceCulling=false;
 const prevLineMat=new BABYLON.StandardMaterial('lpm',scene);
 prevLineMat.diffuseColor=new BABYLON.Color3(1,1,1);
 prevLineMat.alpha=0.55;
@@ -105,12 +138,120 @@ function makeFenceSegment(ax,az,dx,dz,L){
   }
   return g;
 }
+function buildRampMesh(D,h,scene,name,L2){
+  L2=L2===undefined?EST_L2:L2;
+  const hw=EST_W/2,yb=-0.08,L=D+L2+D;
+  const pos=[
+    hw,0,0,     hw,h,D,     hw,h,D+L2,   hw,0,L,    hw,yb,L,   hw,yb,0,
+    -hw,0,0,    -hw,h,D,    -hw,h,D+L2,  -hw,0,L,   -hw,yb,L,  -hw,yb,0
+  ];
+  const idx=[
+    0,1,7, 0,7,6,
+    1,2,8, 1,8,7,
+    2,3,9, 2,9,8,
+    3,4,10, 3,10,9,
+    4,5,11, 4,11,10,
+    5,0,6, 5,6,11,
+    0,1,2, 0,2,3, 0,3,4, 0,4,5,
+    6,11,10, 6,10,9, 6,9,8, 6,8,7
+  ];
+  const m=new BABYLON.Mesh(name,scene);
+  const vd=new BABYLON.VertexData();
+  vd.positions=pos;
+  vd.indices=idx;
+  const norms=new Float32Array(pos.length);
+  BABYLON.VertexData.ComputeNormals(pos,idx,norms);
+  vd.normals=norms;
+  vd.uvs=(()=>{const a=[];for(let i=0;i<pos.length;i+=3)a.push(pos[i+2]*0.5,pos[i]*0.5+0.5);return a;})();
+  vd.applyToMesh(m);
+  return m;
+}
+function buildRampCurbs(g,sides,D,L2,h){
+  for(const sx of sides){
+    const mk=(z1,z2,y1,y2)=>{
+      const Ls=Math.hypot(z2-z1,y2-y1)||0.05;
+      const curb=BABYLON.MeshBuilder.CreateBox('estacadaCurb'+(drawSeq++),{width:0.24,height:0.4,depth:Ls+0.08},scene);
+      const py=(z2-z1)/Ls,pz=-(y2-y1)/Ls;
+      curb.parent=g;
+      curb.position.set(sx,(y1+y2)/2+py*0.2,(z1+z2)/2+pz*0.2);
+      curb.rotation.x=Math.atan2(-(y2-y1),z2-z1);
+      curb.material=curbDMat;curb.isPickable=false;curb.receiveShadows=true;
+      curb.metadata={isLine:true,stype:'estacada',group:g};
+    };
+    mk(-0.06,D+0.06,0,h);
+    mk(D-0.06,D+L2+0.06,h,h);
+    mk(D+L2-0.06,D+L2+D+0.06,h,0);
+  }
+}
+function makeRampSegment(ax,az,dx,dz,D,h){
+  const g=new BABYLON.TransformNode('estacadaSeg'+(drawSeq++),scene);
+  const poly=buildRampMesh(D,h,scene,'estacadaRamp'+(drawSeq++));
+  poly.parent=g;
+  poly.material=estacadaMat;
+  poly.isPickable=true;poly.receiveShadows=true;
+  poly.metadata={isLine:true,stype:'estacada',group:g};
+  buildRampCurbs(g,[-EST_W/2+0.12,EST_W/2-0.12],D,EST_L2,h);
+  g.position.set(ax,0,az);
+  g.rotation.y=segRotY(dx,dz);
+  return g;
+}
+function carPointInBands(px,pz,y,dx,dz){
+  const list=[['curb',(LINE_WIDTH.curb??0.25)+0.18],['fence',0.4]];
+  try{
+    for(const[t,hw]of list){
+      const ds=drawStore&&drawStore[t];
+      if(!ds)continue;
+      for(const poly of ds.polys){
+        if(!Array.isArray(poly)||poly.length<2)continue;
+        for(let i=0;i<poly.length-1;i++){
+          const ax=poly[i][0],az=poly[i][1],bx=poly[i+1][0],bz=poly[i+1][1];
+          const LX=bx-ax,LZ=bz-az,LL=Math.hypot(LX,LZ);
+          if(LL<1e-4)continue;
+          const ux=LX/LL,uz=LZ/LL,px2=-uz,py2=ux;
+          const u=(px-ax)*ux+(pz-az)*uz,v=(px-ax)*px2+(pz-az)*py2;
+          if(u>-hw&&u<LL+hw&&Math.abs(v)<hw)return true;
+        }
+      }
+    }
+    if(dx===0&&dz===0)return false;
+    const ds=drawStore&&drawStore.estacada;
+    if(!ds)return false;
+    const hw=EST_W/2,L2=EST_L2,slope=EST_SLOPE;
+    for(const p of ds.polys){
+      if(!Array.isArray(p)||p.length<2)continue;
+      const ax=p[0][0],az=p[0][1],bx=p[1][0],bz=p[1][1];
+      const LX=bx-ax,LZ=bz-az,LL=Math.hypot(LX,LZ);
+      if(LL<1e-4)continue;
+      const ux=LX/LL,uz=LZ/LL,px2=-uz,py2=ux;
+      const rx=px-ax,rz=pz-az,u=rx*ux+rz*uz,v=rx*px2+rz*py2;
+      if(u<0||u>LL+L2+LL||Math.abs(v)>=hw)continue;
+      const dU=dx*ux+dz*uz,dV=dx*px2+dz*py2;
+      if(Math.abs(dV)<=2*Math.abs(dU))continue;
+      const h=Math.min(LL*slope,3.2);
+      let yt;
+      if(u<=LL)yt=u/LL*h;
+      else if(u<=LL+L2)yt=h;
+      else yt=h*(1-(u-LL-L2)/LL);
+      if(yt-y>0.05)return true;
+    }
+  }catch(e){}
+  return false;
+}
+function carBlocked(nx,nz,y,dx,dz,cs,sn){
+  const pts=[[-0.85,-2.1],[0.85,-2.1],[-0.85,2.1],[0.85,2.1],[0,2.15]];
+  for(const[p0,p1]of pts){
+    const wx=nx+p0*cs+p1*sn,wz=nz-p0*sn+p1*cs;
+    if(carPointInBands(wx,wz,y,dx,dz))return true;
+  }
+  return false;
+}
 function makeLineSegment(type,a,b){
   const ax=a[0],az=a[1],bx=b[0],bz=b[1];
   const dx=bx-ax,dz=bz-az;
   const L=Math.hypot(dx,dz);
   if(L<1e-4)return null;
   if(type==='fence')return makeFenceSegment(ax,az,dx,dz,L);
+  if(type==='estacada')return makeRampSegment(ax,az,dx,dz,L,Math.min(L*EST_SLOPE,3.2));
   const w=LINE_WIDTH[type]??0.1,h=LINE_H[type]??0.006,y=(LINE_Y[type]??0.004);
   const seg=BABYLON.MeshBuilder.CreateBox('drawSeg'+(drawSeq++),{width:w,height:h,depth:L},scene);
   seg.position.set((ax+bx)/2,y,(az+bz)/2);
@@ -124,6 +265,7 @@ function updateCounts(){
   if(countLinesEl)countLinesEl.textContent=drawStore.lines.polys.length;
   if(countCurbEl)countCurbEl.textContent=drawStore.curb.polys.length;
   if(countFenceEl)countFenceEl.textContent=drawStore.fence.polys.length;
+  if(countEstacadaEl)countEstacadaEl.textContent=drawStore.estacada.polys.length;
   syncFinishBtn();
 }
 function syncFinishBtn(){
@@ -132,9 +274,10 @@ function syncFinishBtn(){
   finishLineBtn.style.display=show?'':'none';
   if(show)finishLineBtn.textContent=FINISH_LABELS[editType]||'Завершить';
 }
-const FINISH_LABELS={lines:'Завершить линию',curb:'Завершить бордюр',fence:'Завершить забор'};
+const FINISH_LABELS={lines:'Завершить линию',curb:'Завершить бордюр',fence:'Завершить забор',estacada:'Завершить эстакаду'};
 function updateLinePreview(){
   if(!openLine)return;
+  if(editType==='estacada'){updateRampPreview();return;}
   const last=openLine.pts[openLine.pts.length-1];
   const p=pickGround();
   if(p.hit&&last){
@@ -150,7 +293,25 @@ function updateLinePreview(){
     }else previewSeg.isVisible=false;
   }else previewSeg.isVisible=false;
 }
-function hideLinePreview(){previewSeg.isVisible=false;}
+function hideLinePreview(){previewSeg.isVisible=false;if(rampPreviewGroup){const old=rampPreviewGroup;rampPreviewGroup=null;old.dispose();}}
+let rampPreviewGroup=null;
+function updateRampPreview(){
+  if(rampPreviewGroup){const old=rampPreviewGroup;rampPreviewGroup=null;old.dispose();}
+  const last=openLine&&openLine.pts.length?openLine.pts[openLine.pts.length-1]:null;
+  const p=last?pickGround():null;
+  if(!p||!p.hit)return;
+  const sx=snapX(p.pickedPoint.x),sz=snapZ(p.pickedPoint.z);
+  const dx=sx-last[0],dz=sz-last[1];
+  const D=Math.hypot(dx,dz);
+  if(D<=1e-4)return;
+  const h=Math.min(D*EST_SLOPE,3.2);
+  const g=new BABYLON.TransformNode('rvG'+(drawSeq++),scene);
+  const poly=buildRampMesh(D,h,scene,'rv'+(drawSeq++));
+  poly.parent=g;poly.material=rampPrevMat;poly.isPickable=false;
+  g.position.set(last[0],0,last[1]);
+  g.rotation.y=segRotY(dx,dz);
+  rampPreviewGroup=g;
+}
 function startOpenLine(){openLine={pts:[],meshes:[]};syncFinishBtn();}
 function addLinePoint(x,z){
   if(!openLine)startOpenLine();
@@ -234,7 +395,8 @@ const HINTS={place:'Клик по площадке — поставить кон
 const DRAWHINTS={
   lines:{place:'Кликай по площадке: точки соединяются в белую линию. «Завершить линию» — начать новую',move:'Перемещение разметки не поддерживается',delete:'Клик по разметке — удалить'},
   curb:{place:'Кликай по площадке: точки соединяются в бетонный бордюр. «Завершить линию» — начать новый',move:'Перемещение бордюра не поддерживается',delete:'Клик по бордюру — удалить'},
-  fence:{place:'Кликай по площадке: точки соединяются в деревянный забор. «Завершить линию» — начать новый',move:'Перемещение забора не поддерживается',delete:'Клик по забору — удалить'}
+  fence:{place:'Кликай по площадке: точки соединяются в деревянный забор. «Завершить линию» — начать новый',move:'Перемещение забора не поддерживается',delete:'Клик по забору — удалить'},
+  estacada:{place:'Кликни первый раз — начало подъёма эстакады, второй — вершина. Появится подъём 16% + площадка + спуск 16%. «Завершить» — поставить',move:'Перемещение эстакады не поддерживается',delete:'Клик по эстакаде — удалить'}
 };
 function drawHint(t){return DRAWHINTS[t]||DRAWHINTS.lines;}
 const CURSORS={place:'crosshair',move:'grab',delete:'pointer'};
@@ -242,12 +404,13 @@ let editType='cones';
 const editTypeSel=document.getElementById('editTypeSel');
 const typeIco=document.getElementById('typeIco');
 const typeName=document.getElementById('typeName');
-const TYPE_NAMES={cones:'Конус',lines:'Разметка',curb:'Бордюр',fence:'Забор'};
+const TYPE_NAMES={cones:'Конус',lines:'Разметка',curb:'Бордюр',fence:'Забор',estacada:'Эстакада'};
 const TYPE_ICONS={
   cones:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.6 15.8 21H8.2Z" fill="#ff8c3b" stroke="#1a1200" stroke-width="1.1" stroke-linejoin="round"/><ellipse cx="12" cy="14.4" rx="2.4" ry="1.1" fill="#fff" stroke="#1a1200" stroke-width=".8"/></svg>',
   lines:'<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="10.3" width="4" height="1.7" rx=".85" fill="#fff"/><rect x="10" y="10.3" width="4" height="1.7" rx=".85" fill="#fff"/><rect x="17" y="10.3" width="4" height="1.7" rx=".85" fill="#fff"/></svg>',
   curb:'<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="8.6" width="19" height="5.6" rx="1.2" fill="#fff" stroke="#22303a" stroke-width="1"/><rect x="2.5" y="14.2" width="19" height="1.8" rx=".9" fill="#e8eaed" stroke="#22303a" stroke-width=".8"/></svg>',
-  fence:'<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="14" y="5" width="2" height="16" rx=".6" fill="#6a7075" stroke="#22303a" stroke-width=".8"/><rect x="18.5" y="5" width="2" height="16" rx=".6" fill="#6a7075" stroke="#22303a" stroke-width=".8"/><rect x="3" y="7" width="17.4" height="1.8" rx=".9" fill="#f2f4f6" stroke="#22303a" stroke-width=".7"/><rect x="3" y="14" width="17.4" height="1.8" rx=".9" fill="#f2f4f6" stroke="#22303a" stroke-width=".7"/></svg>'
+  fence:'<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="14" y="5" width="2" height="16" rx=".6" fill="#6a7075" stroke="#22303a" stroke-width=".8"/><rect x="18.5" y="5" width="2" height="16" rx=".6" fill="#6a7075" stroke="#22303a" stroke-width=".8"/><rect x="3" y="7" width="17.4" height="1.8" rx=".9" fill="#f2f4f6" stroke="#22303a" stroke-width=".7"/><rect x="3" y="14" width="17.4" height="1.8" rx=".9" fill="#f2f4f6" stroke="#22303a" stroke-width=".7"/></svg>',
+  estacada:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2.8 18.5 7.5 11h9l4.7 7.5" fill="none" stroke="#9db4c4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><line x1="2.8" y1="18.5" x2="21.2" y2="18.5" stroke="#7c93a4" stroke-width="1.6"/></svg>'
 };
 function setEditType(t){
   if(t!==editType&&editType!=='cones')finishLine();
@@ -474,7 +637,11 @@ function panApply(dt){
 }
 
 // ── 3D-миниатюры типов объектов (рендер через RenderTargetTexture в сцене) ──
-const THUMBS={cones:null,lines:null,curb:null,fence:null};
+const THUMBS={cones:null,lines:null,curb:null,fence:null,estacada:null};
+function previewFrame(type){
+  if(type==='estacada')return{g:4.6,r:4.5,t:0.12};
+  return{g:2,r:2.2,t:type==='cones'?0.35:type==='fence'?0.85:type==='curb'?0.15:0.05};
+}
 function buildTypedPreview(type,scene,parent){
   const n=new BABYLON.TransformNode('tp'+(++drawSeq),scene);
   if(type==='cones'){
@@ -500,7 +667,7 @@ function buildTypedPreview(type,scene,parent){
     cm2.diffuseColor=new BABYLON.Color3(1,1,1);cm2.specularColor=new BABYLON.Color3(0.1,0.1,0.1);
     const c=BABYLON.MeshBuilder.CreateBox('tpc2',{width:0.25,height:0.30,depth:0.9},scene);
     c.parent=n;c.position.set(0,0.15,0);c.material=cm2;
-  }else{
+  }else if(type==='fence'){
     const fpm=new BABYLON.StandardMaterial('tpFPost'+type,scene);
     fpm.diffuseColor=new BABYLON.Color3(0.42,0.46,0.5);fpm.specularColor=new BABYLON.Color3(0.4,0.4,0.42);fpm.specularPower=64;
     const frm=new BABYLON.StandardMaterial('tpFRail'+type,scene);
@@ -513,29 +680,34 @@ function buildTypedPreview(type,scene,parent){
       const post=BABYLON.MeshBuilder.CreateBox('tpfp',{width:0.08,height:1.7,depth:0.08},scene);
       post.parent=n;post.position.set(x,0.85,0);post.material=fpm;
     });
+  }else if(type==='estacada'){
+    const p=buildRampMesh(1.4,0.22,scene,'tpEst'+(drawSeq++),1.2);
+    p.parent=n;p.material=estacadaMat;
+    buildRampCurbs(n,[-EST_W/2+0.12,EST_W/2-0.12],1.4,1.2,0.22);
   }
   n.parent=parent;
   return n;
 }
 function thumbCluster(type){
+  const F=previewFrame(type);
   const R=new BABYLON.TransformNode('thRoot'+type,scene);
   R.position.set(-9999,0,0);
   const gm=new BABYLON.StandardMaterial('thGround'+type,scene);
   gm.diffuseColor=new BABYLON.Color3(0.17,0.18,0.21);gm.specularColor=new BABYLON.Color3(0,0,0);
-  const g=BABYLON.MeshBuilder.CreateGround('thG'+type,{width:2,height:2},scene);
+  const g=BABYLON.MeshBuilder.CreateGround('thG'+type,{width:F.g,height:F.g},scene);
   g.parent=R;g.material=gm;
   buildTypedPreview(type,scene,R);
-  const cy=type==='cones'?0.3:type==='fence'?0.85:0.1;
-  return{root:R,cy:cy};
+  return{root:R,cy:F.t};
 }
 function captureThumb(type){
   try{
     const{root,cy}=thumbCluster(type);
-    const cam=new BABYLON.ArcRotateCamera('thCam'+type,Math.PI/4,Math.PI/2.6,2.2,
+    const F=previewFrame(type);
+    const cam=new BABYLON.ArcRotateCamera('thCam'+type,Math.PI/4,Math.PI/2.6,F.r,
       new BABYLON.Vector3(-9999,cy,0),scene);
     cam.lowerAlphaLimit=Math.PI/4;cam.upperAlphaLimit=Math.PI/4;
     cam.lowerBetaLimit=Math.PI/2.6;cam.upperBetaLimit=Math.PI/2.6;
-    cam.lowerRadiusLimit=2.2;cam.upperRadiusLimit=2.2;
+    cam.lowerRadiusLimit=F.r;cam.upperRadiusLimit=F.r;
     const W=256,H=256;
     const rtt=new BABYLON.RenderTargetTexture('thRtt'+type,{width:W,height:H},scene,false);
     rtt.activeCamera=cam;
@@ -570,17 +742,17 @@ function ensureLivePreview(type){
     s.clearColor=new BABYLON.Color4(0.05,0.086,0.125,1);
     const h=new BABYLON.HemisphericLight('lvH'+type,new BABYLON.Vector3(0.5,1,0.4),s);h.intensity=0.9;
     const d=new BABYLON.DirectionalLight('lvD'+type,new BABYLON.Vector3(-0.5,-1,-0.4),s);d.intensity=0.7;d.position=new BABYLON.Vector3(3,6,2);
+    const F=previewFrame(type);
     const gm=new BABYLON.StandardMaterial('lvGm'+type,s);
     gm.diffuseColor=new BABYLON.Color3(0.17,0.18,0.21);gm.specularColor=new BABYLON.Color3(0,0,0);
-    const g=BABYLON.MeshBuilder.CreateGround('lvG'+type,{width:2,height:2},s);g.material=gm;
+    const g=BABYLON.MeshBuilder.CreateGround('lvG'+type,{width:F.g,height:F.g},s);g.material=gm;
     const rot=new BABYLON.TransformNode('lvRot'+type,s);
-    const cy=type==='cones'?0.35:type==='fence'?0.85:0.08;
     buildTypedPreview(type,s,rot);
-    rot.position.y=cy;
-    const cam=new BABYLON.ArcRotateCamera('lvC'+type,Math.PI/4,Math.PI/2.6,2.2,new BABYLON.Vector3(0,cy,0),s);
+    rot.position.y=F.t;
+    const cam=new BABYLON.ArcRotateCamera('lvC'+type,Math.PI/4,Math.PI/2.6,F.r,new BABYLON.Vector3(0,F.t,0),s);
     cam.lowerAlphaLimit=Math.PI/4;cam.upperAlphaLimit=Math.PI/4;
     cam.lowerBetaLimit=Math.PI/2.6;cam.upperBetaLimit=Math.PI/2.6;
-    cam.lowerRadiusLimit=2.2;cam.upperRadiusLimit=2.2;
+    cam.lowerRadiusLimit=F.r;cam.upperRadiusLimit=F.r;
     s.registerBeforeRender(()=>{rot.rotation.y+=0.016;});
     livePreviews[type]={engine:eng,scene:s,canvas:cv,card:card};
   }catch(e){livePreviews[type]=null;}
@@ -603,7 +775,7 @@ function applyThumbs(){
   document.querySelectorAll('#typeWin .tg-card').forEach(c=>{const ico=c.querySelector('.tg-fallback');fill(ico,c.dataset.type);});
 }
 requestAnimationFrame(()=>requestAnimationFrame(()=>{
-  try{captureThumb('cones');captureThumb('lines');captureThumb('curb');captureThumb('fence');applyThumbs();}catch(e){}
+  try{captureThumb('cones');captureThumb('lines');captureThumb('curb');captureThumb('fence');captureThumb('estacada');applyThumbs();}catch(e){}
 }));
 
 // ── Окно-галерея объектов ───────────────────────────
@@ -612,8 +784,8 @@ const typeBackdrop=document.getElementById('typeBackdrop');
 function openTypeWin(o){
   typeWin.classList.toggle('open',o);
   typeBackdrop.classList.toggle('open',o);
-  if(o){startLive('cones');startLive('lines');startLive('curb');startLive('fence');}
-  else{stopLive('cones');stopLive('lines');stopLive('curb');stopLive('fence');}
+  if(o){startLive('cones');startLive('lines');startLive('curb');startLive('fence');startLive('estacada');}
+  else{stopLive('cones');stopLive('lines');stopLive('curb');stopLive('fence');stopLive('estacada');}
 }
 document.getElementById('editTypeBtn').addEventListener('click',()=>{if(!conesEnabled)return;openTypeWin(true);});
 document.getElementById('typeClose').addEventListener('click',()=>openTypeWin(false));
@@ -655,7 +827,10 @@ function panelLiveBuild(t){
   if(panelLive.node){const old=panelLive.node;panelLive.node=null;old.dispose();}
   const n=new BABYLON.TransformNode('plNode'+t,panelLive.scene);
   buildTypedPreview(t,panelLive.scene,n);
-  if(panelLive.cam)panelLive.cam.setTarget(new BABYLON.Vector3(0,t==='fence'?0.85:t==='cones'?0.35:t==='curb'?0.15:0.05,0));
+  if(panelLive.cam){const F=previewFrame(t);
+    panelLive.cam.setRadius(F.r);
+    panelLive.cam.lowerRadiusLimit=panelLive.cam.upperRadiusLimit=F.r;
+    panelLive.cam.setTarget(new BABYLON.Vector3(0,F.t,0));}
   n.parent=panelLive.root;
   panelLive.node=n;
 }
@@ -690,7 +865,7 @@ addEventListener('keydown',e=>{
   if(e.code==='Digit1')setMode('place');
   else if(e.code==='Digit2')setMode('move');
   else if(e.code==='Digit3')setMode('delete');
-  else if(e.code==='KeyT'){const order=['cones','lines','curb','fence'];setEditType(order[(order.indexOf(editType)+1)%order.length]);}
+  else if(e.code==='KeyT'){const order=['cones','lines','curb','fence','estacada'];setEditType(order[(order.indexOf(editType)+1)%order.length]);}
   else if(e.code==='KeyC')clearCones();
 });
 
@@ -701,3 +876,4 @@ loadCones();
 loadDraw('lines');
 loadDraw('curb');
 loadDraw('fence');
+loadDraw('estacada');
