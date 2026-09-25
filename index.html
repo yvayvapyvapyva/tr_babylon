@@ -186,7 +186,7 @@
     .sw-close{width:36px;height:36px;font-size:16px}
     .sw-body{padding:15px 16px}
     .sw-sec h3{font-size:11.5px;margin-bottom:10px}
-    #clear,#cabBtn,#camFollowBtn,#resetMirrors,.modes button{min-height:44px;font-size:13px;padding:10px 8px}
+    #clear,#cabBtn,#camFollowBtn,#resetMirrors,.modes button,#mapWin .me-clear{min-height:44px;font-size:13px;padding:10px 8px}
     .modes{gap:8px}
     #mapEdit{font-size:14px;padding:12px 14px calc(12px + env(safe-area-inset-bottom,0px))}
     #mapEdit .me-modes button{min-height:48px;font-size:14px}
@@ -492,6 +492,16 @@ document.addEventListener('pointerdown',tgFullscreen,{once:true});
     <div class="mirror-keys" style="margin-top:6px">Ширина и длина огороженной площадки. Изменение пересоздаёт землю и забор.</div>
     <div style="display:flex;gap:8px;margin-top:12px">
       <button class="me-clear" id="applyTerr" style="flex:1">Применить новый размер</button>
+    </div>
+    <div class="sw-sec">
+      <h3>Файл карты</h3>
+      <div style="display:flex;gap:8px">
+        <button class="me-clear" id="mapSaveBtn" style="flex:1">Сохранить карту</button>
+        <button class="me-clear" id="mapLoadBtn" style="flex:1">Загрузить карту</button>
+      </div>
+      <input type="file" id="mapFileInput" accept="application/json,.json" style="display:none">
+      <div class="mirror-keys" style="margin-top:6px">Выгружает конусы, разметку, бордюры, заборы, эстакады и размер площадки в JSON-файл</div>
+      <div class="mirror-keys" id="mapFileStatus" style="margin-top:6px"></div>
     </div>
     <div class="sw-sec">
       <button class="me-clear" id="mapClearAll" style="width:100%;padding:10px 0;border-color:#5a2a2a;color:#e08a6a">Очистить карту</button>

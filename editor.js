@@ -574,6 +574,99 @@ document.getElementById('mapCfgBtn').addEventListener('click',()=>openMapWin(tru
 document.getElementById('mapCfgClose').addEventListener('click',()=>openMapWin(false));
 mapBackdrop.addEventListener('click',()=>openMapWin(false));
 
+// ── Сохранение и загрузка карты в JSON-файл ─────────
+const MAP_FORMAT='tr_babylon_map',MAP_VERSION=1;
+const mapFileInput=document.getElementById('mapFileInput');
+const mapFileStatus=document.getElementById('mapFileStatus');
+const r4=v=>Math.round(v*1e4)/1e4;
+function setMapFileStatus(text,err){
+  if(!mapFileStatus)return;
+  mapFileStatus.textContent=text||'';
+  mapFileStatus.style.color=err?'#e08a6a':'#7fbf8a';
+}
+function collectMapJson(){
+  const map={format:MAP_FORMAT,version:MAP_VERSION,savedAt:new Date().toISOString(),
+    territory:{w:TERR.w,d:TERR.d},
+    cones:coneNodes.map(n=>[r4(n.position.x),r4(n.position.z)])};
+  for(const t of DRAW_TYPES)map[t]=drawStore[t].polys.map(poly=>poly.map(p=>[r4(p[0]),r4(p[1])]));
+  return map;
+}
+function mapFileName(){
+  const d=new Date(),p=n=>String(n).padStart(2,'0');
+  return 'tr_babylon_'+d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())+'_'+p(d.getHours())+p(d.getMinutes())+'.json';
+}
+function saveMapFile(){
+  let blob;
+  try{blob=new Blob([JSON.stringify(collectMapJson(),null,2)],{type:'application/json'});}
+  catch(e){setMapFileStatus('Не удалось сформировать файл',true);return;}
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url;a.download=mapFileName();
+  document.body.appendChild(a);a.click();a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),2000);
+  setMapFileStatus('Карта сохранена: '+a.download);
+}
+function mapNum(v){return (typeof v==='number'&&isFinite(v))?v:null;}
+function readMapPoly(src){
+  if(!Array.isArray(src))return null;
+  const pts=[];
+  for(const p of src){
+    if(!Array.isArray(p))continue;
+    const x=mapNum(p[0]),z=mapNum(p[1]);
+    if(x!==null&&z!==null)pts.push([r4(x),r4(z)]);
+  }
+  return pts.length>=2?pts:null;
+}
+function clampTerr(v,cur){
+  const n=mapNum(v);
+  return n===null?cur:Math.max(10,Math.min(400,Math.round(n)));
+}
+function applyMapJson(data){
+  if(!data||typeof data!=='object'||Array.isArray(data))throw new Error('неверный формат файла');
+  if(data.format&&data.format!==MAP_FORMAT)throw new Error('это не карта площадки');
+  if(!data.territory&&!Array.isArray(data.cones)&&!DRAW_TYPES.some(t=>Array.isArray(data[t])))throw new Error('в файле нет объектов карты');
+  const w=clampTerr(data.territory&&data.territory.w,TERR.w);
+  const d=clampTerr(data.territory&&data.territory.d,TERR.d);
+  clearCones();
+  clearDraw();
+  if(w!==TERR.w||d!==TERR.d)rebuildTerritory(w,d);
+  syncTerrInputs();
+  if(Array.isArray(data.cones)){
+    for(const c of data.cones){
+      if(!Array.isArray(c))continue;
+      const x=mapNum(c[0]),z=mapNum(c[1]);
+      if(x!==null&&z!==null)addConeAt(r4(x),r4(z));
+    }
+  }
+  for(const t of DRAW_TYPES){
+    if(!Array.isArray(data[t]))continue;
+    for(const poly of data[t]){const pts=readMapPoly(poly);if(pts)pushPolyline(t,pts);}
+  }
+  updateCount();
+  updateCounts();
+  DRAW_TYPES.forEach(saveDraw);
+  if(typeof updateMirrorRenderList==='function')updateMirrorRenderList();
+}
+function loadMapFile(file){
+  const rd=new FileReader();
+  rd.onload=()=>{
+    try{applyMapJson(JSON.parse(String(rd.result)));setMapFileStatus('Карта загружена: '+file.name);}
+    catch(e){setMapFileStatus('Ошибка загрузки: '+(e&&e.message||'повреждённый файл'),true);}
+  };
+  rd.onerror=()=>setMapFileStatus('Не удалось прочитать файл',true);
+  rd.readAsText(file);
+}
+if(document.getElementById('mapSaveBtn'))document.getElementById('mapSaveBtn').addEventListener('click',saveMapFile);
+if(document.getElementById('mapLoadBtn'))document.getElementById('mapLoadBtn').addEventListener('click',()=>{
+  if(!mapFileInput)return;
+  mapFileInput.value='';
+  mapFileInput.click();
+});
+if(mapFileInput)mapFileInput.addEventListener('change',()=>{
+  const f=mapFileInput.files&&mapFileInput.files[0];
+  if(f)loadMapFile(f);
+});
+
 // ── Включение/выключение режима редактирования ──────
 const mapBtn=document.getElementById('mapBtn');
 const mapEdit=document.getElementById('mapEdit');
