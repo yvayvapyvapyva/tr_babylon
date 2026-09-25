@@ -48,7 +48,25 @@
     backdrop-filter:blur(6px);padding:10px 12px calc(10px + env(safe-area-inset-bottom,0px));
     font:13px/1.5 'IBM Plex Sans',system-ui,sans-serif;color:#d8e5ee;
     box-shadow:0 -8px 24px rgba(0,0,0,.45)}
-  #mapEdit.open{display:block}
+  #mapEdit.open{display:flex;align-items:center;gap:14px}
+  .me-joy{display:grid;grid-template-columns:repeat(3,48px);grid-template-rows:repeat(3,48px);gap:4px;
+    place-items:center;flex:0 0 auto;margin-left:2px;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+  .me-joy .mj-btn{width:48px;height:48px;background:rgba(12,22,32,.9);border:1px solid #2a4257;border-radius:12px;
+    color:#d8e5ee;font-size:19px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;
+    touch-action:none;-webkit-tap-highlight-color:transparent;-webkit-user-select:none;user-select:none}
+  .me-joy .mj-btn:active,.me-joy .mj-btn.on{background:#ff6d00;color:#1a1200;border-color:#ff6d00}
+  .me-joy .mj-up{grid-column:2;grid-row:1}
+  .me-joy .mj-left{grid-column:1;grid-row:2}
+  .me-joy .mj-right{grid-column:3;grid-row:2}
+  .me-joy .mj-down{grid-column:2;grid-row:3}
+  .me-joy .mj-center{grid-column:2;grid-row:2;width:22px;height:22px;border:1px solid #2a4257;border-radius:50%;
+    background:rgba(12,22,32,.85);display:flex;align-items:center;justify-content:center}
+  .me-joy .mj-center::after{content:"";width:7px;height:7px;background:#ff6d00;border-radius:50%}
+  .me-main{flex:1 1 auto;min-width:0}
+  @media (max-width:640px),(pointer:coarse){
+    .me-joy{grid-template-columns:repeat(3,52px);grid-template-rows:repeat(3,52px)}
+    .me-joy .mj-btn{width:52px;height:52px;font-size:20px}
+  }
   .me-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
   .me-title{font-weight:600;font-size:13px;color:#ff6d00;letter-spacing:.4px}
   .me-done{background:#1c2c3a;color:#9db4c4;border:1px solid #2a4257;border-radius:8px;
@@ -246,6 +264,14 @@ document.addEventListener('pointerdown',tgFullscreen,{once:true});
 <canvas id="renderCanvas"></canvas>
 
 <div id="mapEdit">
+  <div class="me-joy" id="mapJoy">
+    <button class="mj-btn mj-up" data-dir="up" aria-label="Вверх">▲</button>
+    <button class="mj-btn mj-left" data-dir="left" aria-label="Влево">◀</button>
+    <div class="mj-center"></div>
+    <button class="mj-btn mj-right" data-dir="right" aria-label="Вправо">▶</button>
+    <button class="mj-btn mj-down" data-dir="down" aria-label="Вниз">▼</button>
+  </div>
+  <div class="me-main">
   <div class="me-head">
     <span class="me-title">Редактирование карты</span>
     <button class="me-done" id="mapDone">Готово</button>
@@ -269,6 +295,7 @@ document.addEventListener('pointerdown',tgFullscreen,{once:true});
     <button data-mode="lines">Линии</button>
   </div>
   <div class="me-hint" id="hintline">Клик по площадке — поставить конус (шаг 0,25 м)</div>
+  </div>
 </div>
 
 <button id="gearBtn" aria-label="Настройки">
@@ -1240,9 +1267,12 @@ function updateCar(dt){
   strEl.textContent=(deg<0?'← ':deg>0?'→ ':'')+Math.abs(deg)+'°';
 }
 function lerpAngle(a,b,t){let d=(b-a)%(Math.PI*2);if(d>Math.PI)d-=Math.PI*2;if(d<-Math.PI)d+=Math.PI*2;return a+d*t;}
-function updateCamera(){const t=camera.target;
-  t.x+=(car.position.x-t.x)*0.12;t.y+=((car.position.y+1.2)-t.y)*0.12;t.z+=(car.position.z-t.z)*0.12;
-  if(camFollow&&!cabMode&&Math.abs(speed)>0.5){const desired=Math.atan2(-Math.cos(heading),-Math.sin(heading));
+function updateCamera(){
+  if(!conesEnabled){
+    const t=camera.target;
+    t.x+=(car.position.x-t.x)*0.12;t.y+=((car.position.y+1.2)-t.y)*0.12;t.z+=(car.position.z-t.z)*0.12;
+  }
+  if(camFollow&&!cabMode&&Math.abs(speed)>0.5&&!conesEnabled){const desired=Math.atan2(-Math.cos(heading),-Math.sin(heading));
     camera.alpha=lerpAngle(camera.alpha,desired,0.06);}}
 
 scene.onBeforeRenderObservable.add(()=>{
@@ -1275,6 +1305,7 @@ scene.onBeforeRenderObservable.add(()=>{
     cabCam.setTarget(eye.add(new BABYLON.Vector3(L*sy,L*Math.tan(headPitch),L*cy)));
   }
   updateCamera();
+  panApply(dt);
   checkCollisions();
   if(typeof updateFlights==='function')updateFlights(dt);
 });
@@ -1327,6 +1358,39 @@ if(document.getElementById('applyTerr'))document.getElementById('applyTerr').add
   syncTerrInputs();
 });
 document.getElementById('mapDone').addEventListener('click',()=>openMapEdit(false));
+
+// ── Джойстик перемещения по карте (панорамирование камеры) ─────
+const PAN_SPEED=32;
+const panState={x:0,z:0};
+const panIds={up:new Set(),down:new Set(),left:new Set(),right:new Set()};
+const mapJoyBtns=document.querySelectorAll('#mapJoy .mj-btn');
+function panUpdate(){
+  panState.z=(panIds.up.size?1:0)-(panIds.down.size?1:0);
+  panState.x=(panIds.right.size?1:0)-(panIds.left.size?1:0);
+  mapJoyBtns.forEach(b=>{if(panIds[b.dataset.dir].size)b.classList.add('on');else b.classList.remove('on');});
+}
+function panApply(dt){
+  if(!panState.x&&!panState.z)return;
+  const d=camera.position.subtract(camera.target);
+  const f=new BABYLON.Vector3(d.x,0,d.z);
+  if(f.lengthSquared()<1e-9)f.set(0,0,-1);
+  f.normalize();
+  const right=BABYLON.Vector3.Cross(new BABYLON.Vector3(0,1,0),f).normalize();
+  camera.target.addInPlace(right.scale(-panState.x*PAN_SPEED*dt).add(f.scale(-panState.z*PAN_SPEED*dt)));
+  const mx=TERR.w/2+15,mz=TERR.d/2+15;
+  camera.target.x=Math.max(-mx,Math.min(mx,camera.target.x));
+  camera.target.z=Math.max(-mz,Math.min(mz,camera.target.z));
+}
+mapJoyBtns.forEach(b=>{
+  if(!b)return;
+  const d=b.dataset.dir;
+  const press=e=>{e.preventDefault();panIds[d].add(e.pointerId);panUpdate();};
+  const rel=e=>{panIds[d].delete(e.pointerId);panUpdate();};
+  b.addEventListener('pointerdown',press);
+  b.addEventListener('pointerup',rel);
+  b.addEventListener('pointercancel',rel);
+});
+window.addEventListener('blur',()=>{['up','down','left','right'].forEach(d=>{panIds[d].clear();});panUpdate();});
 function closeAllWindows(){openSettings(false);openMapEdit(false);openDecalWin(false);}
 addEventListener('keydown',e=>{if(e.code==='Escape')closeAllWindows();});
 </script>
