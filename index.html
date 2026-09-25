@@ -28,17 +28,19 @@
   #mapBtn:hover svg{stroke:#ff6d00}
   #mapBtn:active{background:#ff6d00;color:#1a1200}
   #mapBtn:active svg{stroke:#1a1200}
-  #settingsBackdrop{position:fixed;inset:0;z-index:18;background:rgba(0,0,0,.5);
+  #settingsBackdrop,#decalBackdrop{position:fixed;inset:0;z-index:18;background:rgba(0,0,0,.5);
     display:none;backdrop-filter:blur(2px)}
-  #settingsBackdrop.open{display:block}
-  #settingsWin{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:19;
+  #settingsBackdrop.open,#decalBackdrop.open{display:block}
+  #decalBackdrop{background:transparent;backdrop-filter:none;pointer-events:none}
+  #settingsWin,#decalWin{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:19;
     width:min(390px,94vw);max-height:86vh;overflow-y:auto;display:none;
     background:rgba(12,22,32,.97);border:1px solid #2a4257;border-radius:12px;
     font:13px/1.5 'IBM Plex Sans',system-ui,sans-serif;color:#d8e5ee;
-    box-shadow:0 18px 50px rgba(0,0,0,.6);-webkit-overflow-scrolling:touch}
-  #settingsWin.open{display:block}
-  #settingsWin::-webkit-scrollbar{width:6px}
-  #settingsWin::-webkit-scrollbar-thumb{background:#2a4257;border-radius:3px}
+    box-shadow:0 18px 50px rgba(0,0,0,.6);-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
+  #settingsWin.open,#decalWin.open{display:block}
+  #decalWin{left:max(14px,env(safe-area-inset-left,0px));right:auto;top:50%;transform:translateY(-50%)}
+  #settingsWin::-webkit-scrollbar,#decalWin::-webkit-scrollbar{width:6px}
+  #settingsWin::-webkit-scrollbar-thumb,#decalWin::-webkit-scrollbar-thumb{background:#2a4257;border-radius:3px}
   body.edit-mode #gearBtn{display:none}
   body.edit-mode #driveCtrl{display:none}
   #mapEdit{position:fixed;left:0;right:0;bottom:0;z-index:8;display:none;
@@ -79,6 +81,7 @@
   .sw-close{width:32px;height:32px;background:#1c2c3a;border:1px solid #2a4257;border-radius:8px;
     color:#9db4c4;font:600 15px/1 inherit;cursor:pointer;-webkit-tap-highlight-color:transparent}
   .sw-close:hover{border-color:#e05e4a;color:#e05e4a}
+  .sw-close.active{border-color:#62d0df;color:#62d0df}
   .sw-body{padding:14px 16px 18px}
   .sw-sec{margin-top:14px;padding-top:12px;border-top:1px solid #223643}
   .sw-sec:first-child{margin-top:0;padding-top:0;border-top:none}
@@ -118,7 +121,7 @@
     #gearBtn svg{width:26px;height:26px}
     #mapBtn{min-height:44px;font-size:13px;border-radius:10px}
     #mapBtn svg{width:18px;height:18px}
-    #settingsWin{width:min(94vw,500px);max-height:calc(100vh - 40px);font:14px/1.5 system-ui,sans-serif;border-radius:14px}
+    #settingsWin,#decalWin{width:min(94vw,500px);max-height:calc(100vh - 40px);font:14px/1.5 system-ui,sans-serif;border-radius:14px}
     .sw-head{padding:14px 16px}
     .sw-title{font-size:15px}
     .sw-close{width:36px;height:36px;font-size:16px}
@@ -202,7 +205,7 @@
   }
   @media (pointer:coarse){
     #driveCtrl{display:flex}
-    #settingsWin{max-height:calc(100vh - 140px)}
+    #settingsWin,#decalWin{max-height:calc(100vh - 140px)}
   }
 </style>
 <script src="https://cdn.babylonjs.com/babylon.js"></script>
@@ -264,6 +267,20 @@ document.addEventListener('pointerdown',tgFullscreen,{once:true});
 </button>
 
 <div id="settingsBackdrop"></div>
+<div id="decalBackdrop"></div>
+<div id="decalWin">
+  <div class="sw-head">
+    <span class="sw-title">Декали</span>
+    <span style="flex:1"></span>
+    <button class="sw-close" id="decalShowAll" aria-label="Показать все" title="Показать все">☑</button>
+    <button class="sw-close" id="decalHideAll" aria-label="Скрыть все" title="Скрыть все">☐</button>
+    <button class="sw-close" id="decalClose" aria-label="Закрыть" style="margin-left:8px">✕</button>
+  </div>
+  <div class="sw-body">
+    <div class="drive"><b>☑</b> — показать все, <b>☐</b> — скрыть все</div>
+    <div id="decalList"></div>
+  </div>
+</div>
 <div id="settingsWin">
   <div class="sw-head">
     <span class="sw-title">Настройки</span>
@@ -281,6 +298,12 @@ document.addEventListener('pointerdown',tgFullscreen,{once:true});
         </svg>
         Редактировать карту
       </button>
+    </div>
+
+    <div class="sw-sec">
+      <h3>Декали</h3>
+      <button id="decalBtn" style="width:100%;padding:10px 0;background:#1c2c3a;color:#9db4c4;border:1px solid #2a4257;border-radius:8px;cursor:pointer;font:600 12px/1 'IBM Plex Sans',system-ui,sans-serif">Настроить декали</button>
+      <div class="mirror-keys" style="margin-top:6px">Показать или скрыть каждый белый шильдик отдельно</div>
     </div>
 
     <div class="sw-sec">
@@ -744,6 +767,7 @@ function adoptLoadedModel(newMeshes,label,flip,pitchFlip){
   disposeCurrentCar();
   modelCarRoot=carRoot;car=carRoot;steerPivots=steer;spinPivots=spin;
   car.position.set(0,0,0);
+  collectDecalMeshes(car);
   setupCarExtras(modelRoot);
   if(cabMode)applyCabMaterials(true);
 }
@@ -920,6 +944,67 @@ function setupCarExtras(modelRoot){
   // Настройка отражений в зеркалах (с pivot для регулировки)
   setupMirrorReflections(modelRoot);
 }
+
+// ── Декали: сбор и управление видимостью через UI ─────────────
+const DECAL_STORE='tr_babylon_decal_visibility';
+let decalMeshes=[];
+const decalKey=n=>{try{return n.replace(/_Decals_0$/,'');}catch(e){return n;}};
+function collectDecalMeshes(root){
+  decalMeshes=[];
+  const meshes=root&&root.getChildMeshes?root.getChildMeshes():[];
+  meshes.forEach(m=>{
+    const mat=m.material;if(!mat)return;
+    const alb=mat.albedoColor||mat.diffuseColor;
+    const em=mat.emissiveColor;
+    if(!alb||!em)return;
+    if(mat.albedoTexture||mat.diffuseTexture)return;
+    const alpha=typeof mat.alpha==='number'?mat.alpha:1;
+    if(alpha<0.99)return;
+    const white=alb.r>0.85&&alb.g>0.85&&alb.b>0.85;
+    const glow=em.r>0.4&&em.g>0.4&&em.b>0.4;
+    if(white&&glow)decalMeshes.push(m);
+  });
+  loadDecalVisibility();
+}
+function loadDecalVisibility(){
+  let st={};
+  try{st=JSON.parse(localStorage.getItem(DECAL_STORE)||'{}');}catch(e){}
+  decalMeshes.forEach(m=>{
+    const k=decalKey(m.name);
+    m.isVisible=st[k]===undefined?true:!!st[k];
+  });
+  buildDecalList();
+}
+function saveDecalVisibility(){
+  const st={};
+  decalMeshes.forEach(m=>{st[decalKey(m.name)]=m.isVisible;});
+  try{localStorage.setItem(DECAL_STORE,JSON.stringify(st));}catch(e){}
+}
+function buildDecalList(){
+  const el=document.getElementById('decalList');if(!el)return;
+  el.innerHTML='';
+  decalMeshes.forEach(m=>{
+    const row=document.createElement('label');
+    row.style.cssText='display:flex;align-items:center;gap:8px;padding:6px 0;font-size:12px;cursor:pointer;word-break:break-all';
+    const cb=document.createElement('input');
+    cb.type='checkbox';cb.checked=m.isVisible;
+    cb.addEventListener('change',()=>{m.isVisible=cb.checked;saveDecalVisibility();});
+    const sp=document.createElement('span');
+    sp.textContent=m.name;
+    row.appendChild(cb);row.appendChild(sp);
+    el.appendChild(row);
+  });
+  refreshDecalPresets();
+}
+
+function refreshDecalPresets(){
+  const anyHidden=decalMeshes.some(m=>!m.isVisible);
+  const anyShown=decalMeshes.some(m=>m.isVisible);
+  const sA=document.getElementById('decalShowAll'),hA=document.getElementById('decalHideAll');
+  if(sA)sA.classList.toggle('active',anyHidden);
+  if(hA)hA.classList.toggle('active',anyShown);
+}
+
 function toggleBlink(){
   const on=(blinkTimer%0.55)<0.30;
   if(blinkerLeft){if(leftGlow)leftGlow.isVisible=on;if(leftFGlow)leftFGlow.isVisible=on;if(leftMirr)leftMirr.isVisible=on;}
@@ -1201,6 +1286,15 @@ gearBtn.addEventListener('click',()=>openSettings(!settingsWin.classList.contain
 document.getElementById('settingsClose').addEventListener('click',()=>openSettings(false));
 settingsBackdrop.addEventListener('click',()=>openSettings(false));
 
+const decalWin=document.getElementById('decalWin');
+const decalBackdrop=document.getElementById('decalBackdrop');
+function openDecalWin(o){decalWin.classList.toggle('open',o);decalBackdrop.classList.toggle('open',o);}
+document.getElementById('decalBtn').addEventListener('click',()=>{openSettings(false);buildDecalList();openDecalWin(true);});
+document.getElementById('decalClose').addEventListener('click',()=>openDecalWin(false));
+decalBackdrop.addEventListener('click',()=>openDecalWin(false));
+document.getElementById('decalShowAll').addEventListener('click',()=>{decalMeshes.forEach(m=>m.isVisible=true);saveDecalVisibility();buildDecalList();});
+document.getElementById('decalHideAll').addEventListener('click',()=>{decalMeshes.forEach(m=>m.isVisible=false);saveDecalVisibility();buildDecalList();});
+
 const mapBtn=document.getElementById('mapBtn');
 const mapEdit=document.getElementById('mapEdit');
 function openMapEdit(o){
@@ -1221,7 +1315,7 @@ if(document.getElementById('applyTerr'))document.getElementById('applyTerr').add
   syncTerrInputs();
 });
 document.getElementById('mapDone').addEventListener('click',()=>openMapEdit(false));
-function closeAllWindows(){openSettings(false);openMapEdit(false);}
+function closeAllWindows(){openSettings(false);openMapEdit(false);openDecalWin(false);}
 addEventListener('keydown',e=>{if(e.code==='Escape')closeAllWindows();});
 </script>
 <script src="editor.js"></script>
