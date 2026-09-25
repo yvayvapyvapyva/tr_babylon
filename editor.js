@@ -51,39 +51,88 @@ function saveCones(){try{localStorage.setItem(STORE_KEY,JSON.stringify(
 function loadCones(){try{const data=JSON.parse(localStorage.getItem(STORE_KEY)||'[]');
   if(Array.isArray(data))data.forEach(([x,z])=>{if(typeof x==='number'&&typeof z==='number')addConeAt(x,z);});}catch(e){}}
 
-// ── белая разметка (линии) ──────────────────────────────────
-const STORE_KEY_MARK='tr_babylon_markings';
+// ── Рисование линиями: разметка / бордюр / забор ──────────────
+const DRAW_TYPES=['lines','curb','fence'];
+const LINE_KEY={lines:'tr_babylon_markings',curb:'tr_babylon_curbs',fence:'tr_babylon_fences'};
+const LINE_WIDTH={lines:0.1,curb:0.25,fence:0.05};
+const LINE_H={lines:0.006,curb:0.30,fence:1.7};
+const LINE_Y={lines:0.0042,curb:0.15,fence:0.85};
+let drawSeq=0;
 const countLinesEl=document.getElementById('countLines');
+const countCurbEl=document.getElementById('countCurb');
+const countFenceEl=document.getElementById('countFence');
 const finishLineBtn=document.getElementById('finishLineBtn');
-const lineWidth=0.1,lineH=0.006,lineY=lineH/2+0.0012;
 const lineMat=new BABYLON.StandardMaterial('lm',scene);
 lineMat.diffuseColor=new BABYLON.Color3(1,1,1);
 lineMat.specularColor=new BABYLON.Color3(0.15,0.15,0.15);
+const curbDMat=new BABYLON.StandardMaterial('cm',scene);
+curbDMat.diffuseColor=new BABYLON.Color3(1,1,1);
+curbDMat.specularColor=new BABYLON.Color3(0.1,0.1,0.1);
+const fencePostMat=new BABYLON.StandardMaterial('fpm',scene);
+fencePostMat.diffuseColor=new BABYLON.Color3(0.42,0.46,0.5);
+fencePostMat.specularColor=new BABYLON.Color3(0.4,0.4,0.42);
+fencePostMat.specularPower=64;
+const fenceRailMat=new BABYLON.StandardMaterial('frm',scene);
+fenceRailMat.diffuseColor=new BABYLON.Color3(0.88,0.9,0.92);
+fenceRailMat.specularColor=new BABYLON.Color3(0.5,0.5,0.5);
+fenceRailMat.specularPower=128;
 const prevLineMat=new BABYLON.StandardMaterial('lpm',scene);
 prevLineMat.diffuseColor=new BABYLON.Color3(1,1,1);
 prevLineMat.alpha=0.55;
 prevLineMat.specularColor=new BABYLON.Color3(0,0,0);
-const previewSeg=BABYLON.MeshBuilder.CreateBox('linePrev',{width:lineWidth,height:lineH,depth:1},scene);
+const previewSeg=BABYLON.MeshBuilder.CreateBox('linePrev',{width:1,height:1,depth:1},scene);
 previewSeg.material=prevLineMat;previewSeg.isVisible=false;previewSeg.isPickable=false;
-const markings=[];       // массивы точек [[x,z],...] по линиям
-const linePolyMeshes=[]; // параллельно: меши сегментов каждой линии
-let openLine=null;       // текущая открытая полилиния {pts,meshes}
-function makeLineSegment(a,b){
+const drawStore={};for(const t of DRAW_TYPES)drawStore[t]={polys:[],arrs:[]};
+let openLine=null;
+function segRotY(dx,dz){return Math.atan2(dx,dz);}
+function makeFenceSegment(ax,az,dx,dz,L){
+  const n=Math.max(1,Math.round(L/(typeof FENCE_STEP==='number'?FENCE_STEP:3.2)));
+  const g=new BABYLON.TransformNode('fenceSeg'+(drawSeq++),scene);
+  const ry=segRotY(dx,dz);
+  [0.8,1.5].forEach(rh=>{
+    const rail=BABYLON.MeshBuilder.CreateBox('fenceRail'+(drawSeq++),{width:0.06,height:0.06,depth:L},scene);
+    rail.parent=g;rail.position.set((ax+ax+dx)/2,rh,(az+az+dz)/2);
+    rail.rotation.y=ry;
+    rail.isPickable=true;rail.receiveShadows=true;
+    rail.material=fenceRailMat;rail.metadata={isLine:true,stype:'fence',group:g};
+  });
+  for(let i=0;i<=n;i++){
+    const t=i/n;
+    const post=BABYLON.MeshBuilder.CreateBox('fencePost'+(drawSeq++),{width:0.08,height:1.7,depth:0.08},scene);
+    post.parent=g;post.position.set(ax+dx*t,0.85,az+dz*t);
+    post.isPickable=true;post.receiveShadows=true;
+    post.material=fencePostMat;post.metadata={isLine:true,stype:'fence',group:g};
+  }
+  return g;
+}
+function makeLineSegment(type,a,b){
   const ax=a[0],az=a[1],bx=b[0],bz=b[1];
   const dx=bx-ax,dz=bz-az;
   const L=Math.hypot(dx,dz);
   if(L<1e-4)return null;
-  const seg=BABYLON.MeshBuilder.CreateBox('lineSeg',{width:lineWidth,height:lineH,depth:L},scene);
-  seg.position.set((ax+bx)/2,lineY,(az+bz)/2);
-  seg.rotation.y=Math.atan2(dx,dz);
-  seg.material=lineMat;
-  seg.isPickable=true;
-  seg.receiveShadows=true;
-  seg.metadata={isLine:true};
+  if(type==='fence')return makeFenceSegment(ax,az,dx,dz,L);
+  const w=LINE_WIDTH[type]??0.1,h=LINE_H[type]??0.006,y=(LINE_Y[type]??0.004);
+  const seg=BABYLON.MeshBuilder.CreateBox('drawSeg'+(drawSeq++),{width:w,height:h,depth:L},scene);
+  seg.position.set((ax+bx)/2,y,(az+bz)/2);
+  seg.rotation.y=segRotY(dx,dz);
+  seg.material=(type==='curb')?curbDMat:lineMat;
+  seg.isPickable=true;seg.receiveShadows=true;
+  seg.metadata={isLine:true,stype:type};
   return seg;
 }
-function updateLineCount(){if(countLinesEl)countLinesEl.textContent=markings.length;syncFinishBtn();}
-function syncFinishBtn(){if(finishLineBtn)finishLineBtn.style.display=(editType==='lines'&&mode==='place'&&openLine)?'':'none';}
+function updateCounts(){
+  if(countLinesEl)countLinesEl.textContent=drawStore.lines.polys.length;
+  if(countCurbEl)countCurbEl.textContent=drawStore.curb.polys.length;
+  if(countFenceEl)countFenceEl.textContent=drawStore.fence.polys.length;
+  syncFinishBtn();
+}
+function syncFinishBtn(){
+  if(!finishLineBtn)return;
+  const show=editType!=='cones'&&mode==='place'&&openLine;
+  finishLineBtn.style.display=show?'':'none';
+  if(show)finishLineBtn.textContent=FINISH_LABELS[editType]||'Завершить';
+}
+const FINISH_LABELS={lines:'Завершить линию',curb:'Завершить бордюр',fence:'Завершить забор'};
 function updateLinePreview(){
   if(!openLine)return;
   const last=openLine.pts[openLine.pts.length-1];
@@ -93,8 +142,9 @@ function updateLinePreview(){
     const dx=sx-last[0],dz=sz-last[1];
     const L=Math.hypot(dx,dz);
     if(L>1e-4){
-      previewSeg.position.set((sx+last[0])/2,lineY,(sz+last[1])/2);
-      previewSeg.scaling.set(1,1,L);
+      const w=LINE_WIDTH[editType]??0.1,h=LINE_H[editType]??0.006,y=(LINE_Y[editType]??0.004);
+      previewSeg.position.set((sx+last[0])/2,y,(sz+last[1])/2);
+      previewSeg.scaling.set(w,h,L);
       previewSeg.rotation.y=Math.atan2(dx,dz);
       previewSeg.isVisible=true;
     }else previewSeg.isVisible=false;
@@ -107,56 +157,66 @@ function addLinePoint(x,z){
   const last=openLine.pts[openLine.pts.length-1];
   if(last&&last[0]===x&&last[1]===z)return;
   openLine.pts.push([x,z]);
-  if(last){const s=makeLineSegment(last,[x,z]);if(s)openLine.meshes.push(s);}
+  if(last){const s=makeLineSegment(editType,last,[x,z]);if(s)openLine.meshes.push(s);}
   updateLinePreview();
 }
 function finishLine(){
   if(!openLine)return;
   if(openLine.pts.length>=2){
-    markings.push(openLine.pts);
-    linePolyMeshes.push(openLine.meshes);
-    updateLineCount();
+    drawStore[editType].polys.push(openLine.pts);
+    drawStore[editType].arrs.push(openLine.meshes);
+    updateCounts();
   }else{
     openLine.meshes.forEach(m=>{try{m.dispose();}catch(e){}});
   }
   openLine=null;
   hideLinePreview();
   syncFinishBtn();
-  saveMarkings();
+  saveDraw(editType);
   if(typeof updateMirrorRenderList==='function')updateMirrorRenderList();
 }
-function saveMarkings(){try{localStorage.setItem(STORE_KEY_MARK,JSON.stringify(markings));}catch(e){}}
-function pushPolyline(pts){
+function saveDraw(type){try{localStorage.setItem(LINE_KEY[type],JSON.stringify(drawStore[type].polys));}catch(e){}}
+function pushPolyline(type,pts){
   const meshes=[];
-  for(let i=1;i<pts.length;i++){const s=makeLineSegment(pts[i-1],pts[i]);if(s)meshes.push(s);}
-  markings.push(pts);
-  linePolyMeshes.push(meshes);
+  for(let i=1;i<pts.length;i++){const s=makeLineSegment(type,pts[i-1],pts[i]);if(s)meshes.push(s);}
+  drawStore[type].polys.push(pts);
+  drawStore[type].arrs.push(meshes);
 }
-function loadMarkings(){try{const d=JSON.parse(localStorage.getItem(STORE_KEY_MARK)||'[]');
+function loadDraw(type){try{const d=JSON.parse(localStorage.getItem(LINE_KEY[type])||'[]');
   if(Array.isArray(d))d.forEach(poly=>{
     if(!Array.isArray(poly)||poly.length<2)return;
     const pts=poly.filter(p=>Array.isArray(p)&&p.length===2&&typeof p[0]==='number'&&typeof p[1]==='number');
-    if(pts.length>=2)pushPolyline(pts);
+    if(pts.length>=2)pushPolyline(type,pts);
   });
-  updateLineCount();}catch(e){}}
-function deletePolylineFromMesh(mesh){
-  for(let i=0;i<linePolyMeshes.length;i++){
-    if(linePolyMeshes[i].includes(mesh)){
-      linePolyMeshes[i].forEach(m=>{try{m.dispose();}catch(e){}});
-      linePolyMeshes.splice(i,1);
-      markings.splice(i,1);
-      updateLineCount();saveMarkings();
-      if(typeof updateMirrorRenderList==='function')updateMirrorRenderList();
-      return;
+  updateCounts();}catch(e){}}
+function findDrawPolyline(mesh){
+  const group=mesh.metadata&&mesh.metadata.group;
+  for(const t of DRAW_TYPES){
+    const arr=drawStore[t].arrs;
+    for(let i=0;i<arr.length;i++){
+      if(arr[i].includes(mesh))return{type:t,i:i};
+      if(group&&arr[i].indexOf(group)>=0)return{type:t,i:i};
     }
   }
+  return null;
 }
-function clearLines(){
+function deletePolylineFromMesh(mesh){
+  const f=findDrawPolyline(mesh);
+  if(!f)return;
+  drawStore[f.type].arrs[f.i].forEach(m=>{try{m.dispose();}catch(e){}});
+  drawStore[f.type].arrs.splice(f.i,1);
+  drawStore[f.type].polys.splice(f.i,1);
+  updateCounts();saveDraw(f.type);
+  if(typeof updateMirrorRenderList==='function')updateMirrorRenderList();
+}
+function clearDraw(){
   finishLine();
-  markings.length=0;
-  linePolyMeshes.forEach(arr=>arr.forEach(m=>{try{m.dispose();}catch(e){}}));
-  linePolyMeshes.length=0;
-  updateLineCount();saveMarkings();
+  for(const t of DRAW_TYPES){
+    drawStore[t].arrs.forEach(arr=>arr.forEach(m=>{try{m.dispose();}catch(e){}}));
+    drawStore[t].polys.length=0;drawStore[t].arrs.length=0;
+    saveDraw(t);
+  }
+  updateCounts();
   if(typeof updateMirrorRenderList==='function')updateMirrorRenderList();
 }
 if(finishLineBtn)finishLineBtn.addEventListener('click',finishLine);
@@ -170,23 +230,32 @@ preview.material=prevMat;preview.position.y=0.05;preview.isVisible=false;preview
 let mode='place',dragging=null,dragOldKey=null,conesEnabled=false;
 const hintline=document.getElementById('hintline');
 const HINTS={place:'Клик по площадке — поставить конус (шаг 0,25 м)',
-  move:'Зажми конус и перетащи в новый узел',delete:'Клик по конусу или линии — удалить'};
-const HINTS_LINES={place:'Кликай по площадке: точки соединяются в белую линию. «Завершить линию» — начать новую',
-  move:'Перемещение линий не поддерживается',delete:'Клик по линии — удалить'};
+  move:'Зажми конус и перетащи в новый узел',delete:'Клик по конусу — удалить'};
+const DRAWHINTS={
+  lines:{place:'Кликай по площадке: точки соединяются в белую линию. «Завершить линию» — начать новую',move:'Перемещение разметки не поддерживается',delete:'Клик по разметке — удалить'},
+  curb:{place:'Кликай по площадке: точки соединяются в бетонный бордюр. «Завершить линию» — начать новый',move:'Перемещение бордюра не поддерживается',delete:'Клик по бордюру — удалить'},
+  fence:{place:'Кликай по площадке: точки соединяются в деревянный забор. «Завершить линию» — начать новый',move:'Перемещение забора не поддерживается',delete:'Клик по забору — удалить'}
+};
+function drawHint(t){return DRAWHINTS[t]||DRAWHINTS.lines;}
 const CURSORS={place:'crosshair',move:'grab',delete:'pointer'};
 let editType='cones';
 const editTypeSel=document.getElementById('editTypeSel');
 const typeIco=document.getElementById('typeIco');
+const typeName=document.getElementById('typeName');
+const TYPE_NAMES={cones:'Конус',lines:'Разметка',curb:'Бордюр',fence:'Забор'};
 const TYPE_ICONS={
   cones:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.6 15.8 21H8.2Z" fill="#ff8c3b" stroke="#1a1200" stroke-width="1.1" stroke-linejoin="round"/><ellipse cx="12" cy="14.4" rx="2.4" ry="1.1" fill="#fff" stroke="#1a1200" stroke-width=".8"/></svg>',
-  lines:'<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="10.3" width="4" height="1.7" rx=".85" fill="#fff"/><rect x="10" y="10.3" width="4" height="1.7" rx=".85" fill="#fff"/><rect x="17" y="10.3" width="4" height="1.7" rx=".85" fill="#fff"/></svg>'
+  lines:'<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="10.3" width="4" height="1.7" rx=".85" fill="#fff"/><rect x="10" y="10.3" width="4" height="1.7" rx=".85" fill="#fff"/><rect x="17" y="10.3" width="4" height="1.7" rx=".85" fill="#fff"/></svg>',
+  curb:'<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="8.6" width="19" height="5.6" rx="1.2" fill="#fff" stroke="#22303a" stroke-width="1"/><rect x="2.5" y="14.2" width="19" height="1.8" rx=".9" fill="#e8eaed" stroke="#22303a" stroke-width=".8"/></svg>',
+  fence:'<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="14" y="5" width="2" height="16" rx=".6" fill="#6a7075" stroke="#22303a" stroke-width=".8"/><rect x="18.5" y="5" width="2" height="16" rx=".6" fill="#6a7075" stroke="#22303a" stroke-width=".8"/><rect x="3" y="7" width="17.4" height="1.8" rx=".9" fill="#f2f4f6" stroke="#22303a" stroke-width=".7"/><rect x="3" y="14" width="17.4" height="1.8" rx=".9" fill="#f2f4f6" stroke="#22303a" stroke-width=".7"/></svg>'
 };
 function setEditType(t){
-  if(editType==='lines'&&t!=='lines')finishLine();
+  if(t!==editType&&editType!=='cones')finishLine();
   editType=t;
   if(editTypeSel)editTypeSel.value=t;
   if(typeIco)typeIco.innerHTML=(THUMBS[t]?'<img src="'+THUMBS[t]+'" alt="">':(TYPE_ICONS[t]||''));
-  if(t==='lines'&&mode==='move')setMode('place');
+  if(typeName)typeName.textContent=TYPE_NAMES[t]||t;
+  if(t!=='cones'&&mode==='move')setMode('place');
   else setMode(mode);
   if(typeof updatePanelLive==='function'&&typeof panelLive!=='undefined'&&panelLive.started)updatePanelLive();
 }
@@ -195,13 +264,13 @@ function setMode(m){
   finishLine();
   mode=m;
   document.querySelectorAll('#editModes button').forEach(b=>b.classList.toggle('active',b.dataset.mode===m));
-  hintline.textContent=editType==='lines'?HINTS_LINES[mode]:HINTS[mode];
+  hintline.textContent=editType==='cones'?HINTS[mode]:drawHint(editType)[mode];
   canvas.style.cursor=CURSORS[mode];preview.isVisible=false;
-  document.getElementById('editModes').classList.toggle('lines',editType==='lines'&&mode==='move');
+  document.getElementById('editModes').classList.toggle('draw',editType!=='cones'&&mode==='move');
   syncFinishBtn();
 }
 document.querySelectorAll('#editModes button').forEach(b=>b.addEventListener('click',()=>{if(!conesEnabled)return;setMode(b.dataset.mode)}));
-document.getElementById('mapClearAll').addEventListener('click',()=>{clearCones();clearLines();});
+document.getElementById('mapClearAll').addEventListener('click',()=>{clearCones();clearDraw();});
 
 function carHits(px,pz){
   const dx=px-car.position.x,dz=pz-car.position.z;
@@ -280,7 +349,7 @@ scene.onPointerObservable.add(pi=>{const t=pi.type;
       preview.position.set(sx,0.05,sz);
       preview.isVisible=(mode==='place')||!!dragging;
       if(dragging)dragging.position.set(sx,0,sz);
-      if(editType==='lines'&&mode==='place')updateLinePreview();else hideLinePreview();
+      if(editType!=='cones'&&mode==='place')updateLinePreview();else hideLinePreview();
     }else{
       preview.isVisible=false;
       hideLinePreview();
@@ -311,7 +380,7 @@ scene.onPointerObservable.add(pi=>{const t=pi.type;
     }
     else if(mode==='place'){const p=pickGround();if(p.hit){
       const px=snapX(p.pickedPoint.x),pz=snapZ(p.pickedPoint.z);
-      if(editType==='lines')addLinePoint(px,pz);else addConeAt(px,pz);}}
+      if(editType!=='cones')addLinePoint(px,pz);else addConeAt(px,pz);}}
   }
 });
 
@@ -322,7 +391,7 @@ function setConesEnabled(on){
   if(editTypeSel){editTypeSel.disabled=!on;}
   if(document.getElementById('editType'))document.getElementById('editType').classList.toggle('disabled',!on);
   preview.isVisible=false;
-  hintline.textContent=on?(editType==='lines'?HINTS_LINES[mode]:HINTS[mode]):'Режим редактирования карты выключен';
+  hintline.textContent=on?(editType==='cones'?HINTS[mode]:drawHint(editType)[mode]):'Режим редактирования карты выключен';
   if(on)setMode(mode);
 }
 document.querySelectorAll('.modes').forEach(el=>el.classList.add('disabled'));
@@ -405,33 +474,58 @@ function panApply(dt){
 }
 
 // ── 3D-миниатюры типов объектов (рендер через RenderTargetTexture в сцене) ──
-const THUMBS={cones:null,lines:null};
+const THUMBS={cones:null,lines:null,curb:null,fence:null};
+function buildTypedPreview(type,scene,parent){
+  const n=new BABYLON.TransformNode('tp'+(++drawSeq),scene);
+  if(type==='cones'){
+    const cm=new BABYLON.StandardMaterial('tpCone'+type,scene);
+    cm.diffuseColor=new BABYLON.Color3(1,0.43,0);cm.specularColor=new BABYLON.Color3(0,0,0);
+    const sm=new BABYLON.StandardMaterial('tpStripe'+type,scene);
+    sm.diffuseColor=new BABYLON.Color3(1,1,1);sm.specularColor=new BABYLON.Color3(0.15,0.15,0.15);
+    const bm=new BABYLON.StandardMaterial('tpBase'+type,scene);
+    bm.diffuseColor=new BABYLON.Color3(0.82,0.24,0.07);bm.specularColor=new BABYLON.Color3(0,0,0);
+    const base=BABYLON.MeshBuilder.CreateBox('tpb',{width:0.25,depth:0.25,height:0.035},scene);
+    base.parent=n;base.position.y=0.0175;base.material=bm;
+    const body=BABYLON.MeshBuilder.CreateCylinder('tpc',{diameterTop:0.04,diameterBottom:0.19,height:0.45,tessellation:24},scene);
+    body.parent=n;body.position.y=0.26;body.material=cm;
+    const st=BABYLON.MeshBuilder.CreateCylinder('tps',{diameterTop:0.10,diameterBottom:0.14,height:0.11,tessellation:24},scene);
+    st.parent=n;st.position.y=0.255;st.material=sm;
+  }else if(type==='lines'){
+    const lm=new BABYLON.StandardMaterial('tpLine'+type,scene);
+    lm.diffuseColor=new BABYLON.Color3(1,1,1);lm.specularColor=new BABYLON.Color3(0.15,0.15,0.15);
+    const m=BABYLON.MeshBuilder.CreateBox('tpl',{width:0.22,height:0.02,depth:0.8},scene);
+    m.parent=n;m.position.set(0,0.01,0);m.material=lm;
+  }else if(type==='curb'){
+    const cm2=new BABYLON.StandardMaterial('tpCurb'+type,scene);
+    cm2.diffuseColor=new BABYLON.Color3(1,1,1);cm2.specularColor=new BABYLON.Color3(0.1,0.1,0.1);
+    const c=BABYLON.MeshBuilder.CreateBox('tpc2',{width:0.25,height:0.30,depth:0.9},scene);
+    c.parent=n;c.position.set(0,0.15,0);c.material=cm2;
+  }else{
+    const fpm=new BABYLON.StandardMaterial('tpFPost'+type,scene);
+    fpm.diffuseColor=new BABYLON.Color3(0.42,0.46,0.5);fpm.specularColor=new BABYLON.Color3(0.4,0.4,0.42);fpm.specularPower=64;
+    const frm=new BABYLON.StandardMaterial('tpFRail'+type,scene);
+    frm.diffuseColor=new BABYLON.Color3(0.88,0.9,0.92);frm.specularColor=new BABYLON.Color3(0.5,0.5,0.5);frm.specularPower=128;
+    [0.8,1.5].forEach(rh=>{
+      const rail=BABYLON.MeshBuilder.CreateBox('tpfr',{width:1.6,height:0.06,depth:0.06},scene);
+      rail.parent=n;rail.position.set(0,rh,0);rail.material=frm;
+    });
+    [-0.8,0.8].forEach(x=>{
+      const post=BABYLON.MeshBuilder.CreateBox('tpfp',{width:0.08,height:1.7,depth:0.08},scene);
+      post.parent=n;post.position.set(x,0.85,0);post.material=fpm;
+    });
+  }
+  n.parent=parent;
+  return n;
+}
 function thumbCluster(type){
   const R=new BABYLON.TransformNode('thRoot'+type,scene);
   R.position.set(-9999,0,0);
-  const cm=new BABYLON.StandardMaterial('thCone'+type,scene);
-  cm.diffuseColor=new BABYLON.Color3(1,0.43,0);cm.specularColor=new BABYLON.Color3(0,0,0);
-  const sm=new BABYLON.StandardMaterial('thStripe'+type,scene);
-  sm.diffuseColor=new BABYLON.Color3(1,1,1);sm.specularColor=new BABYLON.Color3(0.15,0.15,0.15);
-  const bm=new BABYLON.StandardMaterial('thBase'+type,scene);
-  bm.diffuseColor=new BABYLON.Color3(0.82,0.24,0.07);bm.specularColor=new BABYLON.Color3(0,0,0);
   const gm=new BABYLON.StandardMaterial('thGround'+type,scene);
   gm.diffuseColor=new BABYLON.Color3(0.17,0.18,0.21);gm.specularColor=new BABYLON.Color3(0,0,0);
   const g=BABYLON.MeshBuilder.CreateGround('thG'+type,{width:2,height:2},scene);
   g.parent=R;g.material=gm;
-  let cy=0.05;
-  if(type==='cones'){
-    cy=0.3;
-    const base=BABYLON.MeshBuilder.CreateBox('thB'+type,{width:0.25,depth:0.25,height:0.035},scene);
-    base.parent=R;base.position.y=0.0175;base.material=bm;
-    const body=BABYLON.MeshBuilder.CreateCylinder('thC'+type,{diameterTop:0.04,diameterBottom:0.19,height:0.45,tessellation:24},scene);
-    body.parent=R;body.position.y=0.26;body.material=cm;
-    const st=BABYLON.MeshBuilder.CreateCylinder('thS'+type,{diameterTop:0.10,diameterBottom:0.14,height:0.11,tessellation:24},scene);
-    st.parent=R;st.position.y=0.255;st.material=sm;
-  }else{
-    const m=BABYLON.MeshBuilder.CreateBox('thL'+type,{width:0.22,height:0.02,depth:0.8},scene);
-    m.parent=R;m.position.set(0,0.01,0);m.material=sm;
-  }
+  buildTypedPreview(type,scene,R);
+  const cy=type==='cones'?0.3:type==='fence'?0.85:0.1;
   return{root:R,cy:cy};
 }
 function captureThumb(type){
@@ -480,27 +574,8 @@ function ensureLivePreview(type){
     gm.diffuseColor=new BABYLON.Color3(0.17,0.18,0.21);gm.specularColor=new BABYLON.Color3(0,0,0);
     const g=BABYLON.MeshBuilder.CreateGround('lvG'+type,{width:2,height:2},s);g.material=gm;
     const rot=new BABYLON.TransformNode('lvRot'+type,s);
-    let cy=0.08;
-    if(type==='cones'){
-      cy=0.35;
-      const cm=new BABYLON.StandardMaterial('lvCm'+type,s);
-      cm.diffuseColor=new BABYLON.Color3(1,0.43,0);cm.specularColor=new BABYLON.Color3(0,0,0);
-      const sm=new BABYLON.StandardMaterial('lvSm'+type,s);
-      sm.diffuseColor=new BABYLON.Color3(1,1,1);sm.specularColor=new BABYLON.Color3(0.15,0.15,0.15);
-      const bm=new BABYLON.StandardMaterial('lvBm'+type,s);
-      bm.diffuseColor=new BABYLON.Color3(0.82,0.24,0.07);bm.specularColor=new BABYLON.Color3(0,0,0);
-      const base=BABYLON.MeshBuilder.CreateBox('lvB'+type,{width:0.25,depth:0.25,height:0.035},s);
-      base.parent=rot;base.position.y=0.0175;base.material=bm;
-      const body=BABYLON.MeshBuilder.CreateCylinder('lvC'+type,{diameterTop:0.04,diameterBottom:0.19,height:0.45,tessellation:24},s);
-      body.parent=rot;body.position.y=0.26;body.material=cm;
-      const st=BABYLON.MeshBuilder.CreateCylinder('lvS'+type,{diameterTop:0.10,diameterBottom:0.14,height:0.11,tessellation:24},s);
-      st.parent=rot;st.position.y=0.255;st.material=sm;
-    }else{
-      const lm=new BABYLON.StandardMaterial('lvLm'+type,s);
-      lm.diffuseColor=new BABYLON.Color3(1,1,1);lm.specularColor=new BABYLON.Color3(0.15,0.15,0.15);
-      const m=BABYLON.MeshBuilder.CreateBox('lvL'+type,{width:0.22,height:0.02,depth:0.8},s);
-      m.parent=rot;m.position.set(0,0.01,0);m.material=lm;
-    }
+    const cy=type==='cones'?0.35:type==='fence'?0.85:0.08;
+    buildTypedPreview(type,s,rot);
     rot.position.y=cy;
     const cam=new BABYLON.ArcRotateCamera('lvC'+type,Math.PI/4,Math.PI/2.6,2.2,new BABYLON.Vector3(0,cy,0),s);
     cam.lowerAlphaLimit=Math.PI/4;cam.upperAlphaLimit=Math.PI/4;
@@ -528,7 +603,7 @@ function applyThumbs(){
   document.querySelectorAll('#typeWin .tg-card').forEach(c=>{const ico=c.querySelector('.tg-fallback');fill(ico,c.dataset.type);});
 }
 requestAnimationFrame(()=>requestAnimationFrame(()=>{
-  try{captureThumb('cones');captureThumb('lines');applyThumbs();}catch(e){}
+  try{captureThumb('cones');captureThumb('lines');captureThumb('curb');captureThumb('fence');applyThumbs();}catch(e){}
 }));
 
 // ── Окно-галерея объектов ───────────────────────────
@@ -537,8 +612,8 @@ const typeBackdrop=document.getElementById('typeBackdrop');
 function openTypeWin(o){
   typeWin.classList.toggle('open',o);
   typeBackdrop.classList.toggle('open',o);
-  if(o){startLive('cones');startLive('lines');}
-  else{stopLive('cones');stopLive('lines');}
+  if(o){startLive('cones');startLive('lines');startLive('curb');startLive('fence');}
+  else{stopLive('cones');stopLive('lines');stopLive('curb');stopLive('fence');}
 }
 document.getElementById('editTypeBtn').addEventListener('click',()=>{if(!conesEnabled)return;openTypeWin(true);});
 document.getElementById('typeClose').addEventListener('click',()=>openTypeWin(false));
@@ -571,35 +646,17 @@ function panelLiveEnsure(){
     cam.lowerBetaLimit=Math.PI/2.6;cam.upperBetaLimit=Math.PI/2.6;
     cam.lowerRadiusLimit=2.2;cam.upperRadiusLimit=2.2;
     s.registerBeforeRender(()=>{root.rotation.y+=0.02;});
-    panelLive.eng=eng;panelLive.scene=s;panelLive.root=root;
+    panelLive.eng=eng;panelLive.scene=s;panelLive.root=root;panelLive.cam=cam;
   }catch(e){return false;}
   return true;
 }
 function panelLiveBuild(t){
   if(!panelLive.scene)return;
-  const s=panelLive.scene,root=panelLive.root;
   if(panelLive.node){const old=panelLive.node;panelLive.node=null;old.dispose();}
-  const n=new BABYLON.TransformNode('plNode'+t,s);
-  if(t==='cones'){
-    const cm=new BABYLON.StandardMaterial('plCm'+t,s);
-    cm.diffuseColor=new BABYLON.Color3(1,0.43,0);cm.specularColor=new BABYLON.Color3(0,0,0);
-    const sm=new BABYLON.StandardMaterial('plSm'+t,s);
-    sm.diffuseColor=new BABYLON.Color3(1,1,1);sm.specularColor=new BABYLON.Color3(0.15,0.15,0.15);
-    const bm=new BABYLON.StandardMaterial('plBm'+t,s);
-    bm.diffuseColor=new BABYLON.Color3(0.85,0.26,0.08);bm.specularColor=new BABYLON.Color3(0,0,0);
-    const base=BABYLON.MeshBuilder.CreateBox('plB',{width:0.25,depth:0.25,height:0.035},s);
-    base.parent=n;base.position.y=0.0175;base.material=bm;
-    const body=BABYLON.MeshBuilder.CreateCylinder('plC',{diameterTop:0.04,diameterBottom:0.19,height:0.45,tessellation:24},s);
-    body.parent=n;body.position.y=0.26;body.material=cm;
-    const st=BABYLON.MeshBuilder.CreateCylinder('plS',{diameterTop:0.10,diameterBottom:0.14,height:0.11,tessellation:24},s);
-    st.parent=n;st.position.y=0.255;st.material=sm;
-  }else{
-    const lm=new BABYLON.StandardMaterial('plLm'+t,s);
-    lm.diffuseColor=new BABYLON.Color3(1,1,1);lm.specularColor=new BABYLON.Color3(0.15,0.15,0.15);
-    const m=BABYLON.MeshBuilder.CreateBox('plL',{width:0.22,height:0.02,depth:0.8},s);
-    m.parent=n;m.position.set(0,0.01,0);m.material=lm;
-  }
-  n.parent=root;
+  const n=new BABYLON.TransformNode('plNode'+t,panelLive.scene);
+  buildTypedPreview(t,panelLive.scene,n);
+  if(panelLive.cam)panelLive.cam.setTarget(new BABYLON.Vector3(0,t==='fence'?0.85:t==='cones'?0.35:t==='curb'?0.15:0.05,0));
+  n.parent=panelLive.root;
   panelLive.node=n;
 }
 function updatePanelLive(){
@@ -633,7 +690,7 @@ addEventListener('keydown',e=>{
   if(e.code==='Digit1')setMode('place');
   else if(e.code==='Digit2')setMode('move');
   else if(e.code==='Digit3')setMode('delete');
-  else if(e.code==='KeyT')setEditType(editType==='lines'?'cones':'lines');
+  else if(e.code==='KeyT'){const order=['cones','lines','curb','fence'];setEditType(order[(order.indexOf(editType)+1)%order.length]);}
   else if(e.code==='KeyC')clearCones();
 });
 
@@ -641,4 +698,6 @@ addEventListener('keydown',e=>{
 setEditType('cones');
 setMode('place');
 loadCones();
-loadMarkings();
+loadDraw('lines');
+loadDraw('curb');
+loadDraw('fence');
