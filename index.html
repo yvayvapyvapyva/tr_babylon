@@ -28,51 +28,56 @@
   #mapBtn:hover svg{stroke:#ff6d00}
   #mapBtn:active{background:#ff6d00;color:#1a1200}
   #mapBtn:active svg{stroke:#1a1200}
-  #settingsBackdrop,#decalBackdrop{position:fixed;inset:0;z-index:18;background:rgba(0,0,0,.5);
+  #settingsBackdrop,#decalBackdrop,#mapBackdrop,#typeBackdrop{position:fixed;inset:0;z-index:18;background:rgba(0,0,0,.5);
     display:none;backdrop-filter:blur(2px)}
-  #settingsBackdrop.open,#decalBackdrop.open{display:block}
+  #settingsBackdrop.open,#decalBackdrop.open,#mapBackdrop.open,#typeBackdrop.open{display:block}
   #decalBackdrop{background:transparent;backdrop-filter:none;pointer-events:none}
-  #settingsWin,#decalWin{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:19;
+  #settingsWin,#decalWin,#mapWin,#typeWin{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:19;
     width:min(390px,94vw);max-height:86vh;overflow-y:auto;display:none;
     background:rgba(12,22,32,.97);border:1px solid #2a4257;border-radius:12px;
     font:13px/1.5 'IBM Plex Sans',system-ui,sans-serif;color:#d8e5ee;
     box-shadow:0 18px 50px rgba(0,0,0,.6);-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
-  #settingsWin.open,#decalWin.open{display:block}
+  #settingsWin.open,#decalWin.open,#mapWin.open,#typeWin.open{display:block}
   #decalWin{left:max(14px,env(safe-area-inset-left,0px));right:auto;top:50%;transform:translateY(-50%)}
-  #settingsWin::-webkit-scrollbar,#decalWin::-webkit-scrollbar{width:6px}
-  #settingsWin::-webkit-scrollbar-thumb,#decalWin::-webkit-scrollbar-thumb{background:#2a4257;border-radius:3px}
+  #settingsWin::-webkit-scrollbar,#decalWin::-webkit-scrollbar,#mapWin::-webkit-scrollbar,#typeWin::-webkit-scrollbar{width:6px}
+  #settingsWin::-webkit-scrollbar-thumb,#decalWin::-webkit-scrollbar-thumb,#mapWin::-webkit-scrollbar-thumb,#typeWin::-webkit-scrollbar-thumb{background:#2a4257;border-radius:3px}
   body.edit-mode #gearBtn{display:none}
   body.edit-mode #driveCtrl{display:none}
-  #mapEdit{position:fixed;left:0;right:0;bottom:0;z-index:8;display:none;
-    background:rgba(12,22,32,.94);border-top:1px solid #2a4257;
-    backdrop-filter:blur(6px);padding:10px 12px calc(10px + env(safe-area-inset-bottom,0px));
-    font:13px/1.5 'IBM Plex Sans',system-ui,sans-serif;color:#d8e5ee;
-    box-shadow:0 -8px 24px rgba(0,0,0,.45)}
+  .me-top-hint{position:fixed;top:max(10px,env(safe-area-inset-top,0px));left:50%;transform:translateX(-50%);
+    z-index:9;display:none;max-width:calc(100vw - 24px);text-align:center;white-space:normal;
+    background:rgba(12,22,32,.88);border:1px solid #2a4257;border-radius:10px;
+    padding:6px 12px;font:12px/1.4 'IBM Plex Sans',system-ui,sans-serif;color:#d8e5ee;
+    box-shadow:0 6px 18px rgba(0,0,0,.4)}
+  body.edit-mode .me-top-hint{display:block}
+  #mapEdit{position:fixed;left:max(14px,env(safe-area-inset-left,0px));bottom:14px;z-index:8;display:none;
+    width:max-content;max-width:calc(100vw - 28px);
+    background:rgba(12,22,32,.9);border:1px solid #2a4257;border-radius:14px;
+    box-shadow:0 8px 24px rgba(0,0,0,.45);padding:10px 12px;
+    font:13px/1.5 'IBM Plex Sans',system-ui,sans-serif;color:#d8e5ee}
   #mapEdit.open{display:flex;align-items:center;gap:14px}
-  .me-joy{display:grid;grid-template-columns:repeat(3,48px);grid-template-rows:repeat(3,48px);gap:4px;
-    place-items:center;flex:0 0 auto;margin-left:2px;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
-  .me-joy .mj-btn{width:48px;height:48px;background:rgba(12,22,32,.9);border:1px solid #2a4257;border-radius:12px;
-    color:#d8e5ee;font-size:19px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;
-    touch-action:none;-webkit-tap-highlight-color:transparent;-webkit-user-select:none;user-select:none}
-  .me-joy .mj-btn:active,.me-joy .mj-btn.on{background:#ff6d00;color:#1a1200;border-color:#ff6d00}
-  .me-joy .mj-up{grid-column:2;grid-row:1}
-  .me-joy .mj-left{grid-column:1;grid-row:2}
-  .me-joy .mj-right{grid-column:3;grid-row:2}
-  .me-joy .mj-down{grid-column:2;grid-row:3}
-  .me-joy .mj-center{grid-column:2;grid-row:2;width:22px;height:22px;border:1px solid #2a4257;border-radius:50%;
-    background:rgba(12,22,32,.85);display:flex;align-items:center;justify-content:center}
-  .me-joy .mj-center::after{content:"";width:7px;height:7px;background:#ff6d00;border-radius:50%}
+  .me-joy{flex:0 0 auto;display:flex;align-items:center;justify-content:center;
+    -webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+  .mj-base{position:relative;width:104px;height:104px;border-radius:50%;
+    background:radial-gradient(circle at 35% 30%,#22313f,#0c1620 72%);
+    border:1px solid #2a4257;box-shadow:0 4px 14px rgba(0,0,0,.45),inset 0 0 0 5px rgba(12,22,32,.55);
+    touch-action:none;cursor:grab;-webkit-tap-highlight-color:transparent;box-sizing:border-box}
+  .mj-base.on{border-color:#ff6d00}
+  .mj-knob{position:absolute;left:50%;top:50%;width:44px;height:44px;margin:0;border-radius:50%;
+    background:radial-gradient(circle at 35% 30%,#2a4257,#16304a 70%);
+    border:2px solid #ff6d00;box-shadow:0 3px 8px rgba(0,0,0,.5);
+    transform:translate(-50%,-50%);pointer-events:none}
   .me-main{flex:1 1 auto;min-width:0}
   @media (max-width:640px),(pointer:coarse){
-    .me-joy{grid-template-columns:repeat(3,52px);grid-template-rows:repeat(3,52px)}
-    .me-joy .mj-btn{width:52px;height:52px;font-size:20px}
+    .mj-base{width:112px;height:112px}
+    .mj-knob{width:48px;height:48px}
   }
-  .me-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+  .me-head{display:flex;align-items:center;justify-content:flex-end;margin-bottom:8px}
   .me-title{font-weight:600;font-size:13px;color:#ff6d00;letter-spacing:.4px}
   .me-done{background:#1c2c3a;color:#9db4c4;border:1px solid #2a4257;border-radius:8px;
     font:600 12px/1 inherit;padding:8px 16px;cursor:pointer;
     -webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none}
   .me-done:hover{border-color:#62d0df;color:#62d0df}
+  #mapDone.me-done{width:34px;height:34px;padding:0;border-radius:9px;font-size:15px;line-height:1;flex:0 0 auto}
   .me-row{display:flex;gap:8px;align-items:center;margin-bottom:8px;justify-content:flex-end}
   .me-count{color:#7c93a4;font-size:12px;white-space:nowrap;margin-right:auto}
   .me-count b{color:#ff6d00}
@@ -85,7 +90,7 @@
     border:1px solid #2a4257;border-radius:10px;font:600 13px/1 inherit;cursor:pointer;transition:.15s;
     -webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none}
   .me-modes button:hover{border-color:#ff6d00;color:#ff6d00}
-  .me-hint{color:#7c93a4;font-size:12px;min-height:18px;margin-top:8px}
+  .me-hint{color:#7c93a4;font-size:12px;min-height:18px;margin-top:8px;max-width:280px;white-space:normal}
   .me-terr{display:flex;align-items:center;gap:8px;margin-bottom:8px;justify-content:flex-end}
   .me-terr-label{color:#7c93a4;font-size:12px;white-space:nowrap;margin-right:auto}
   .me-terr input{width:64px;min-height:36px;box-sizing:border-box;background:#1c2c3a;border:1px solid #2a4257;border-radius:8px;
@@ -105,10 +110,45 @@
   .sw-sec:first-child{margin-top:0;padding-top:0;border-top:none}
   .sw-sec h3{margin:0 0 9px;font-size:11px;font-weight:600;color:#62d0df;letter-spacing:.6px;text-transform:uppercase}
   .modes{display:flex;gap:6px;margin-bottom:10px}
+  .me-modes{flex-direction:column;align-items:stretch;width:92px;margin:0}
+  .me-modes button{width:100%}
   .modes button{flex:1;padding:7px 4px;background:#1c2c3a;color:#9db4c4;
     border:1px solid #2a4257;border-radius:8px;font:600 11px/1.2 inherit;cursor:pointer;transition:.15s}
   .modes button:hover{border-color:#ff6d00;color:#ff6d00}
   .modes button.active{background:#ff6d00;color:#1a1200;border-color:#ff6d00}
+  .modes.lines button[data-mode="move"]{opacity:.35;pointer-events:none}
+  .me-body{display:flex;gap:10px;align-items:flex-start}
+  .me-type{margin:0;width:auto;position:relative}
+  .me-type-native{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none;border:0;padding:0;margin:0}
+  .t-ico{width:22px;height:22px;display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto}
+  .t-ico svg{width:100%;height:100%;display:block}
+  .t-ico img{width:100%;height:100%;object-fit:contain;display:block;border-radius:6px;background:rgba(12,22,32,.85)}
+  .t-caret{color:#7c93a4;font-size:11px;line-height:1}
+  .me-type-thumb{width:auto;box-sizing:border-box;display:flex;align-items:center;justify-content:center;gap:8px;
+    background:rgba(12,22,32,.95);color:#d8e5ee;border:1px solid #2a4257;border-radius:10px;
+    padding:6px 8px;font:600 13px/1 'IBM Plex Sans',system-ui,sans-serif;cursor:pointer;
+    -webkit-tap-highlight-color:transparent;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
+  .me-type-thumb:hover{border-color:#ff6d00}
+  .me-type-thumb .t-ico{width:108px;height:108px}
+  .me-type-thumb .t-ico img{width:100%;height:100%;object-fit:contain;border-radius:8px}
+  .me-type-thumb .tv-wrap{position:relative;width:108px;height:108px;display:inline-flex;align-items:center;justify-content:center;overflow:hidden;border-radius:8px}
+  .me-type-thumb .me-type-canvas{position:absolute;inset:0;width:100%;height:100%;display:none;border-radius:6px}
+  .me-type-thumb .me-type-canvas.on{display:block}
+  .me-type.disabled .me-type-thumb{opacity:.45;pointer-events:none}
+  .tg-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .tg-card{display:flex;flex-direction:column;align-items:center;gap:8px;padding:12px 8px;background:#1c2c3a;
+    border:1px solid #2a4257;border-radius:12px;cursor:pointer;color:#d8e5ee;font:600 13px/1 'IBM Plex Sans',system-ui,sans-serif;
+    -webkit-tap-highlight-color:transparent;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
+  .tg-card:hover{border-color:#ff6d00}
+  .tg-card .t-ico{width:100%;height:96px}
+  .tg-card .t-ico img{width:100%;height:100%;object-fit:contain;border-radius:8px}
+  .tg-card .t-ico svg{width:100%;height:100%}
+  .tg-card .tg-lbl{margin-top:2px}
+  .tv-wrap{position:relative;width:100%;height:96px;display:flex;align-items:center;justify-content:center;box-sizing:border-box}
+  .tg-canvas{position:absolute;inset:0;width:100%;height:100%;display:none;border-radius:8px}
+  .tg-canvas.on{display:block}
+  .tg-fallback{width:100%;height:100%}
+  .tg-fallback img{width:100%;height:100%;object-fit:contain;border-radius:8px}
   .cone-toggle{font-size:12px;color:#9db4c4;margin-bottom:8px;user-select:none;cursor:pointer}
   .cone-toggle input{accent-color:#ff6d00;cursor:pointer}
   .modes.disabled{opacity:.4;pointer-events:none}
@@ -139,7 +179,7 @@
     #gearBtn svg{width:26px;height:26px}
     #mapBtn{min-height:44px;font-size:13px;border-radius:10px}
     #mapBtn svg{width:18px;height:18px}
-    #settingsWin,#decalWin{width:min(94vw,500px);max-height:calc(100vh - 40px);font:14px/1.5 system-ui,sans-serif;border-radius:14px}
+    #settingsWin,#decalWin,#mapWin,#typeWin{width:min(94vw,500px);max-height:calc(100vh - 40px);font:14px/1.5 system-ui,sans-serif;border-radius:14px}
     .sw-head{padding:14px 16px}
     .sw-title{font-size:15px}
     .sw-close{width:36px;height:36px;font-size:16px}
@@ -223,7 +263,7 @@
   }
   @media (pointer:coarse){
     #driveCtrl{display:flex}
-    #settingsWin,#decalWin{max-height:calc(100vh - 140px)}
+    #settingsWin,#decalWin,#mapWin,#typeWin{max-height:calc(100vh - 140px)}
   }
 </style>
 <script src="https://cdn.babylonjs.com/babylon.js"></script>
@@ -263,38 +303,42 @@ document.addEventListener('pointerdown',tgFullscreen,{once:true});
 
 <canvas id="renderCanvas"></canvas>
 
+<div class="me-top-hint" id="hintline">Клик по площадке — поставить конус (шаг 0,25 м)</div>
+
 <div id="mapEdit">
-  <div class="me-joy" id="mapJoy">
-    <button class="mj-btn mj-up" data-dir="up" aria-label="Вверх">▲</button>
-    <button class="mj-btn mj-left" data-dir="left" aria-label="Влево">◀</button>
-    <div class="mj-center"></div>
-    <button class="mj-btn mj-right" data-dir="right" aria-label="Вправо">▶</button>
-    <button class="mj-btn mj-down" data-dir="down" aria-label="Вниз">▼</button>
+  <div class="me-joy">
+    <div class="mj-base" id="joyBase" aria-label="Перемещение по карте">
+      <div class="mj-knob" id="joyKnob"></div>
+    </div>
   </div>
   <div class="me-main">
   <div class="me-head">
-    <span class="me-title">Редактирование карты</span>
-    <button class="me-done" id="mapDone">Готово</button>
+    <button class="me-done" id="mapDone" aria-label="Выйти из режима редактирования">✕</button>
   </div>
   <div class="me-row">
-    <span class="me-count">Конусов: <b id="count">0</b> · Линий: <b id="countLines">0</b></span>
     <button class="me-clear" id="finishLineBtn" style="display:none">Завершить линию</button>
-    <button class="me-clear" id="clear">Очистить</button>
+    <button class="me-clear" id="mapCfgBtn">Карта</button>
   </div>
-  <div class="me-terr">
-    <span class="me-terr-label">Территория (Ш × Д), м</span>
-    <input type="number" id="terrW" min="10" max="400" step="5" value="100">
-    <span class="x">×</span>
-    <input type="number" id="terrD" min="10" max="400" step="5" value="100">
-    <button class="me-clear" id="applyTerr">Применить</button>
+  <div class="me-body">
+  <div class="me-type" id="editType">
+    <select id="editTypeSel" class="me-type-native" tabindex="-1" aria-hidden="true">
+      <option value="cones" selected>Конусы</option>
+      <option value="lines">Разметка</option>
+    </select>
+    <button class="me-type-thumb" id="editTypeBtn" aria-label="Выбрать объект">
+      <span class="tv-wrap me-type-wrap">
+        <canvas class="me-type-canvas" id="panelLiveCanvas" width="108" height="108"></canvas>
+        <span class="t-ico" id="typeIco"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.6 15.8 21H8.2Z" fill="#ff8c3b" stroke="#1a1200" stroke-width="1.1" stroke-linejoin="round"/><ellipse cx="12" cy="14.4" rx="2.4" ry="1.1" fill="#fff" stroke="#1a1200" stroke-width=".8"/></svg></span>
+      </span>
+      <span class="t-caret">▾</span>
+    </button>
   </div>
-  <div class="modes me-modes">
+  <div class="modes me-modes" id="editModes">
     <button data-mode="place" class="active">Поставить</button>
-    <button data-mode="move">Двигать</button>
+    <button data-mode="move">Переместить</button>
     <button data-mode="delete">Удалить</button>
-    <button data-mode="lines">Линии</button>
   </div>
-  <div class="me-hint" id="hintline">Клик по площадке — поставить конус (шаг 0,25 м)</div>
+  </div>
   </div>
 </div>
 
@@ -423,6 +467,55 @@ document.addEventListener('pointerdown',tgFullscreen,{once:true});
       <button class="dv-zoombtn" id="dvZoomIn" aria-label="Приблизить">+</button>
       <button class="dv-zoombtn" id="dvZoomOut" aria-label="Отдалить">−</button>
     </div>
+  </div>
+</div>
+
+<div id="mapBackdrop"></div>
+<div id="mapWin">
+  <div class="sw-head">
+    <span class="sw-title">Настройки карты</span>
+    <button class="sw-close" id="mapCfgClose" aria-label="Закрыть">✕</button>
+  </div>
+  <div class="sw-body">
+    <div class="me-count" style="margin-bottom:10px">Конусов: <b id="count">0</b> · Линий: <b id="countLines">0</b></div>
+    <div class="me-terr">
+      <span class="me-terr-label">Размер территории (Ш × Д), м</span>
+      <input type="number" id="terrW" min="10" max="400" step="5" value="100">
+      <span class="x">×</span>
+      <input type="number" id="terrD" min="10" max="400" step="5" value="100">
+    </div>
+    <div class="mirror-keys" style="margin-top:6px">Ширина и длина огороженной площадки. Изменение пересоздаёт землю и забор.</div>
+    <div style="display:flex;gap:8px;margin-top:12px">
+      <button class="me-clear" id="applyTerr" style="flex:1">Применить новый размер</button>
+    </div>
+    <div class="sw-sec">
+      <button class="me-clear" id="mapClearAll" style="width:100%;padding:10px 0;border-color:#5a2a2a;color:#e08a6a">Очистить карту</button>
+      <div class="mirror-keys" style="margin-top:6px">Удалить все конусы и линии разметки</div>
+    </div>
+  </div>
+</div>
+
+<div id="typeBackdrop"></div>
+<div id="typeWin">
+  <div class="sw-head">
+    <span class="sw-title">Объекты</span>
+    <button class="sw-close" id="typeClose" aria-label="Закрыть">✕</button>
+  </div>
+  <div class="sw-body tg-grid">
+    <button class="tg-card" data-type="cones">
+      <div class="tv-wrap">
+        <canvas class="tg-canvas" width="140" height="140"></canvas>
+        <span class="t-ico tg-fallback"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.6 15.8 21H8.2Z" fill="#ff8c3b" stroke="#1a1200" stroke-width="1.1" stroke-linejoin="round"/><ellipse cx="12" cy="14.4" rx="2.4" ry="1.1" fill="#fff" stroke="#1a1200" stroke-width=".8"/></svg></span>
+      </div>
+      <span class="tg-lbl">Конус</span>
+    </button>
+    <button class="tg-card" data-type="lines">
+      <div class="tv-wrap">
+        <canvas class="tg-canvas" width="140" height="140"></canvas>
+        <span class="t-ico tg-fallback"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="10.3" width="4" height="1.7" rx=".85" fill="#fff"/><rect x="10" y="10.3" width="4" height="1.7" rx=".85" fill="#fff"/><rect x="17" y="10.3" width="4" height="1.7" rx=".85" fill="#fff"/></svg></span>
+      </div>
+      <span class="tg-lbl">Разметка</span>
+    </button>
   </div>
 </div>
 
@@ -1173,11 +1266,11 @@ addEventListener('keydown',e=>{
   const a=keyMap[e.code];
   if(a!==undefined){keys[a]=true;if(e.code.startsWith('Arrow')||e.code==='Space')e.preventDefault();}
   
-  if(!conesEnabled&&(e.code==='Digit1'||e.code==='Digit2'||e.code==='Digit3'||e.code==='Digit4'||e.code==='KeyC')){e.preventDefault();return;}
+  if(!conesEnabled&&(e.code==='Digit1'||e.code==='Digit2'||e.code==='Digit3'||e.code==='KeyT'||e.code==='KeyC')){e.preventDefault();return;}
   if(e.code==='Digit1')setMode('place');
   else if(e.code==='Digit2')setMode('move');
   else if(e.code==='Digit3')setMode('delete');
-  else if(e.code==='Digit4')setMode('lines');
+  else if(e.code==='KeyT')setEditType(editType==='lines'?'cones':'lines');
   else if(e.code==='KeyC')clearCones();
   else if(e.code==='KeyV')setCabMode(!cabMode);
   else if(e.code==='KeyF'){camFollow=!camFollow;syncCamFollowBtn();}
@@ -1338,6 +1431,13 @@ decalBackdrop.addEventListener('click',()=>openDecalWin(false));
 document.getElementById('decalShowAll').addEventListener('click',()=>{decalMeshes.forEach(m=>m.isVisible=true);saveDecalVisibility();buildDecalList();});
 document.getElementById('decalHideAll').addEventListener('click',()=>{decalMeshes.forEach(m=>m.isVisible=false);saveDecalVisibility();buildDecalList();});
 
+const mapWin=document.getElementById('mapWin');
+const mapBackdrop=document.getElementById('mapBackdrop');
+function openMapWin(o){mapWin.classList.toggle('open',o);mapBackdrop.classList.toggle('open',o);}
+document.getElementById('mapCfgBtn').addEventListener('click',()=>openMapWin(true));
+document.getElementById('mapCfgClose').addEventListener('click',()=>openMapWin(false));
+mapBackdrop.addEventListener('click',()=>openMapWin(false));
+
 const mapBtn=document.getElementById('mapBtn');
 const mapEdit=document.getElementById('mapEdit');
 function openMapEdit(o){
@@ -1345,6 +1445,8 @@ function openMapEdit(o){
   mapEdit.classList.toggle('open',o);
   setConesEnabled(o);
   grid.isVisible=o;axes.isVisible=o;
+  if(o){updatePanelLive();}
+  else{stopPanelLive();}
 }
 mapBtn.addEventListener('click',()=>{
   openSettings(false);
@@ -1356,19 +1458,32 @@ syncTerrInputs();
 if(document.getElementById('applyTerr'))document.getElementById('applyTerr').addEventListener('click',()=>{
   rebuildTerritory(parseFloat(terrWEl.value),parseFloat(terrDEl.value));
   syncTerrInputs();
+  openMapWin(false);
 });
 document.getElementById('mapDone').addEventListener('click',()=>openMapEdit(false));
 
 // ── Джойстик перемещения по карте (панорамирование камеры) ─────
 const PAN_SPEED=32;
 const panState={x:0,z:0};
-const panIds={up:new Set(),down:new Set(),left:new Set(),right:new Set()};
-const mapJoyBtns=document.querySelectorAll('#mapJoy .mj-btn');
-function panUpdate(){
-  panState.z=(panIds.up.size?1:0)-(panIds.down.size?1:0);
-  panState.x=(panIds.right.size?1:0)-(panIds.left.size?1:0);
-  mapJoyBtns.forEach(b=>{if(panIds[b.dataset.dir].size)b.classList.add('on');else b.classList.remove('on');});
+const joyBase=document.getElementById('joyBase'),joyKnob=document.getElementById('joyKnob');
+const JOY_R=30,JOY_RM=32;
+let joyActive=false,joyId=-1;
+function joySet(px,py){
+  const r=joyBase.getBoundingClientRect();
+  let dx=(px-(r.left+r.width/2))/JOY_RM,dy=(py-(r.top+r.height/2))/JOY_RM;
+  const L=Math.hypot(dx,dy);
+  if(L>1){dx/=L;dy/=L;}
+  panState.x=dx;panState.z=-dy;
+  joyKnob.style.transform='translate(calc(-50% + '+dx*JOY_R+'px),calc(-50% + '+dy*JOY_R+'px))';
 }
+function joyReset(){panState.x=0;panState.z=0;joyActive=false;joyId=-1;joyKnob.style.transform='translate(-50%,-50%)';joyBase.classList.remove('on');}
+if(joyBase){
+  joyBase.addEventListener('pointerdown',e=>{e.preventDefault();joyBase.setPointerCapture(e.pointerId);joyActive=true;joyId=e.pointerId;joyBase.classList.add('on');joySet(e.clientX,e.clientY);});
+  joyBase.addEventListener('pointermove',e=>{if(joyActive&&e.pointerId===joyId)joySet(e.clientX,e.clientY);});
+  joyBase.addEventListener('pointerup',e=>{if(e.pointerId===joyId)joyReset();});
+  joyBase.addEventListener('pointercancel',e=>{if(e.pointerId===joyId)joyReset();});
+}
+window.addEventListener('blur',joyReset);
 function panApply(dt){
   if(!panState.x&&!panState.z)return;
   const d=camera.position.subtract(camera.target);
@@ -1381,17 +1496,229 @@ function panApply(dt){
   camera.target.x=Math.max(-mx,Math.min(mx,camera.target.x));
   camera.target.z=Math.max(-mz,Math.min(mz,camera.target.z));
 }
-mapJoyBtns.forEach(b=>{
-  if(!b)return;
-  const d=b.dataset.dir;
-  const press=e=>{e.preventDefault();panIds[d].add(e.pointerId);panUpdate();};
-  const rel=e=>{panIds[d].delete(e.pointerId);panUpdate();};
-  b.addEventListener('pointerdown',press);
-  b.addEventListener('pointerup',rel);
-  b.addEventListener('pointercancel',rel);
-});
-window.addEventListener('blur',()=>{['up','down','left','right'].forEach(d=>{panIds[d].clear();});panUpdate();});
-function closeAllWindows(){openSettings(false);openMapEdit(false);openDecalWin(false);}
+
+// ── 3D-миниатюры типов объектов (рендер через RenderTargetTexture в сцене) ──
+const THUMBS={cones:null,lines:null};
+function thumbCluster(type){
+  const R=new BABYLON.TransformNode('thRoot'+type,scene);
+  R.position.set(-9999,0,0);
+  const cm=new BABYLON.StandardMaterial('thCone'+type,scene);
+  cm.diffuseColor=new BABYLON.Color3(1,0.43,0);cm.specularColor=new BABYLON.Color3(0,0,0);
+  const sm=new BABYLON.StandardMaterial('thStripe'+type,scene);
+  sm.diffuseColor=new BABYLON.Color3(1,1,1);sm.specularColor=new BABYLON.Color3(0.15,0.15,0.15);
+  const bm=new BABYLON.StandardMaterial('thBase'+type,scene);
+  bm.diffuseColor=new BABYLON.Color3(0.82,0.24,0.07);bm.specularColor=new BABYLON.Color3(0,0,0);
+  const gm=new BABYLON.StandardMaterial('thGround'+type,scene);
+  gm.diffuseColor=new BABYLON.Color3(0.17,0.18,0.21);gm.specularColor=new BABYLON.Color3(0,0,0);
+  const g=BABYLON.MeshBuilder.CreateGround('thG'+type,{width:2,height:2},scene);
+  g.parent=R;g.material=gm;
+  let cy=0.05;
+  if(type==='cones'){
+    cy=0.3;
+    const base=BABYLON.MeshBuilder.CreateBox('thB'+type,{width:0.25,depth:0.25,height:0.035},scene);
+    base.parent=R;base.position.y=0.0175;base.material=bm;
+    const body=BABYLON.MeshBuilder.CreateCylinder('thC'+type,{diameterTop:0.04,diameterBottom:0.19,height:0.45,tessellation:24},scene);
+    body.parent=R;body.position.y=0.26;body.material=cm;
+    const st=BABYLON.MeshBuilder.CreateCylinder('thS'+type,{diameterTop:0.10,diameterBottom:0.14,height:0.11,tessellation:24},scene);
+    st.parent=R;st.position.y=0.255;st.material=sm;
+  }else{
+    const m=BABYLON.MeshBuilder.CreateBox('thL'+type,{width:0.22,height:0.02,depth:0.8},scene);
+    m.parent=R;m.position.set(0,0.01,0);m.material=sm;
+  }
+  return{root:R,cy:cy};
+}
+function captureThumb(type){
+  try{
+    const{root,cy}=thumbCluster(type);
+    const cam=new BABYLON.ArcRotateCamera('thCam'+type,Math.PI/4,Math.PI/2.6,2.2,
+      new BABYLON.Vector3(-9999,cy,0),scene);
+    cam.lowerAlphaLimit=Math.PI/4;cam.upperAlphaLimit=Math.PI/4;
+    cam.lowerBetaLimit=Math.PI/2.6;cam.upperBetaLimit=Math.PI/2.6;
+    cam.lowerRadiusLimit=2.2;cam.upperRadiusLimit=2.2;
+    const W=256,H=256;
+    const rtt=new BABYLON.RenderTargetTexture('thRtt'+type,{width:W,height:H},scene,false);
+    rtt.activeCamera=cam;
+    rtt.renderList=root.getChildMeshes();
+    const oldClear=scene.clearColor.clone();
+    scene.clearColor=new BABYLON.Color4(0.05,0.086,0.125,1);
+    try{rtt.render();}catch(e1){}
+    scene.clearColor=oldClear;
+    try{
+      const buf=rtt.readPixels(0,0,W,H);
+      const clamped=new Uint8ClampedArray(buf.buffer,buf.byteOffset,buf.byteLength);
+      const ic=document.createElement('canvas');ic.width=W;ic.height=H;
+      const gc=ic.getContext('2d');
+      gc.putImageData(new ImageData(clamped,W,H),0,0);
+      THUMBS[type]=ic.toDataURL('image/png');
+    }catch(e2){}
+    rtt.dispose();cam.dispose();root.dispose();
+  }catch(e){}
+}
+// ── Живые 3D-предпросмотры в галерее объектов ───────────
+const livePreviews={};
+function ensureLivePreview(type){
+  if(livePreviews[type]!==undefined)return livePreviews[type];
+  livePreviews[type]=null;
+  try{
+    const card=document.querySelector('#typeWin .tg-card[data-type="'+type+'"]');
+    if(!card)return null;
+    const cv=card.querySelector('canvas');
+    if(!cv.getContext('webgl')&&!cv.getContext('experimental-webgl'))return null;
+    const eng=new BABYLON.Engine(cv,true);
+    const s=new BABYLON.Scene(eng);
+    s.clearColor=new BABYLON.Color4(0.05,0.086,0.125,1);
+    const h=new BABYLON.HemisphericLight('lvH'+type,new BABYLON.Vector3(0.5,1,0.4),s);h.intensity=0.9;
+    const d=new BABYLON.DirectionalLight('lvD'+type,new BABYLON.Vector3(-0.5,-1,-0.4),s);d.intensity=0.7;d.position=new BABYLON.Vector3(3,6,2);
+    const gm=new BABYLON.StandardMaterial('lvGm'+type,s);
+    gm.diffuseColor=new BABYLON.Color3(0.17,0.18,0.21);gm.specularColor=new BABYLON.Color3(0,0,0);
+    const g=BABYLON.MeshBuilder.CreateGround('lvG'+type,{width:2,height:2},s);g.material=gm;
+    const rot=new BABYLON.TransformNode('lvRot'+type,s);
+    let cy=0.08;
+    if(type==='cones'){
+      cy=0.35;
+      const cm=new BABYLON.StandardMaterial('lvCm'+type,s);
+      cm.diffuseColor=new BABYLON.Color3(1,0.43,0);cm.specularColor=new BABYLON.Color3(0,0,0);
+      const sm=new BABYLON.StandardMaterial('lvSm'+type,s);
+      sm.diffuseColor=new BABYLON.Color3(1,1,1);sm.specularColor=new BABYLON.Color3(0.15,0.15,0.15);
+      const bm=new BABYLON.StandardMaterial('lvBm'+type,s);
+      bm.diffuseColor=new BABYLON.Color3(0.82,0.24,0.07);bm.specularColor=new BABYLON.Color3(0,0,0);
+      const base=BABYLON.MeshBuilder.CreateBox('lvB'+type,{width:0.25,depth:0.25,height:0.035},s);
+      base.parent=rot;base.position.y=0.0175;base.material=bm;
+      const body=BABYLON.MeshBuilder.CreateCylinder('lvC'+type,{diameterTop:0.04,diameterBottom:0.19,height:0.45,tessellation:24},s);
+      body.parent=rot;body.position.y=0.26;body.material=cm;
+      const st=BABYLON.MeshBuilder.CreateCylinder('lvS'+type,{diameterTop:0.10,diameterBottom:0.14,height:0.11,tessellation:24},s);
+      st.parent=rot;st.position.y=0.255;st.material=sm;
+    }else{
+      const lm=new BABYLON.StandardMaterial('lvLm'+type,s);
+      lm.diffuseColor=new BABYLON.Color3(1,1,1);lm.specularColor=new BABYLON.Color3(0.15,0.15,0.15);
+      const m=BABYLON.MeshBuilder.CreateBox('lvL'+type,{width:0.22,height:0.02,depth:0.8},s);
+      m.parent=rot;m.position.set(0,0.01,0);m.material=lm;
+    }
+    rot.position.y=cy;
+    const cam=new BABYLON.ArcRotateCamera('lvC'+type,Math.PI/4,Math.PI/2.6,2.2,new BABYLON.Vector3(0,cy,0),s);
+    cam.lowerAlphaLimit=Math.PI/4;cam.upperAlphaLimit=Math.PI/4;
+    cam.lowerBetaLimit=Math.PI/2.6;cam.upperBetaLimit=Math.PI/2.6;
+    cam.lowerRadiusLimit=2.2;cam.upperRadiusLimit=2.2;
+    s.registerBeforeRender(()=>{rot.rotation.y+=0.016;});
+    livePreviews[type]={engine:eng,scene:s,canvas:cv,card:card};
+  }catch(e){livePreviews[type]=null;}
+  return livePreviews[type];
+}
+function startLive(type){
+  const p=ensureLivePreview(type);if(!p)return;
+  p.canvas.classList.add('on');
+  const fb=p.card?p.card.querySelector('.tg-fallback'):null;if(fb)fb.style.display='none';
+  p.engine.runRenderLoop(()=>p.scene.render());
+}
+function stopLive(type){
+  const p=livePreviews[type];
+  if(p){p.engine.stopRenderLoop();p.canvas.classList.remove('on');
+    const fb=p.card?p.card.querySelector('.tg-fallback'):null;if(fb)fb.style.display='';}
+}
+function applyThumbs(){
+  const fill=(el,type)=>{if(el&&THUMBS[type])el.innerHTML='<img src="'+THUMBS[type]+'" alt="">';};
+  if(typeof typeIco!=='undefined'&&typeIco)fill(typeIco,editType);
+  document.querySelectorAll('#typeWin .tg-card').forEach(c=>{const ico=c.querySelector('.tg-fallback');fill(ico,c.dataset.type);});
+}
+requestAnimationFrame(()=>requestAnimationFrame(()=>{
+  try{captureThumb('cones');captureThumb('lines');applyThumbs();}catch(e){}
+}));
+
+// ── Окно-галерея объектов ───────────────────────────
+const typeWin=document.getElementById('typeWin');
+const typeBackdrop=document.getElementById('typeBackdrop');
+function openTypeWin(o){
+  typeWin.classList.toggle('open',o);
+  typeBackdrop.classList.toggle('open',o);
+  if(o){startLive('cones');startLive('lines');}
+  else{stopLive('cones');stopLive('lines');}
+}
+document.getElementById('editTypeBtn').addEventListener('click',()=>{if(!conesEnabled)return;openTypeWin(true);});
+document.getElementById('typeClose').addEventListener('click',()=>openTypeWin(false));
+typeBackdrop.addEventListener('click',()=>openTypeWin(false));
+document.querySelectorAll('#typeWin .tg-card').forEach(c=>c.addEventListener('click',()=>{
+  if(!conesEnabled)return;
+  setEditType(c.dataset.type);
+  openTypeWin(false);
+}));
+
+// ── Живой 3D-предпросмотр в кнопке панели редактора ─────
+const panelLive={eng:null,scene:null,root:null,node:null,started:false};
+function panelLiveEnsure(){
+  if(panelLive.eng)return true;
+  try{
+    const cv=document.getElementById('panelLiveCanvas');
+    if(!cv)return false;
+    if(!cv.getContext('webgl')&&!cv.getContext('experimental-webgl'))return false;
+    const eng=new BABYLON.Engine(cv,true);
+    const s=new BABYLON.Scene(eng);
+    s.clearColor=new BABYLON.Color4(0.06,0.1,0.14,0);
+    const h=new BABYLON.HemisphericLight('plH',new BABYLON.Vector3(0.5,1,0.4),s);h.intensity=0.9;
+    const d=new BABYLON.DirectionalLight('plD',new BABYLON.Vector3(-0.5,-1,-0.4),s);d.intensity=0.7;d.position=new BABYLON.Vector3(3,6,2);
+    const gm=new BABYLON.StandardMaterial('plGm',s);
+    gm.diffuseColor=new BABYLON.Color3(0.17,0.18,0.21);gm.specularColor=new BABYLON.Color3(0,0,0);
+    const g=BABYLON.MeshBuilder.CreateGround('plG',{width:2,height:2},s);g.material=gm;
+    const root=new BABYLON.TransformNode('plRoot',s);
+    const cam=new BABYLON.ArcRotateCamera('plC',Math.PI/4,Math.PI/2.6,2.2,new BABYLON.Vector3(0,0.3,0),s);
+    cam.lowerAlphaLimit=Math.PI/4;cam.upperAlphaLimit=Math.PI/4;
+    cam.lowerBetaLimit=Math.PI/2.6;cam.upperBetaLimit=Math.PI/2.6;
+    cam.lowerRadiusLimit=2.2;cam.upperRadiusLimit=2.2;
+    s.registerBeforeRender(()=>{root.rotation.y+=0.02;});
+    panelLive.eng=eng;panelLive.scene=s;panelLive.root=root;
+  }catch(e){return false;}
+  return true;
+}
+function panelLiveBuild(t){
+  if(!panelLive.scene)return;
+  const s=panelLive.scene,root=panelLive.root;
+  if(panelLive.node){const old=panelLive.node;panelLive.node=null;old.dispose();}
+  const n=new BABYLON.TransformNode('plNode'+t,s);
+  if(t==='cones'){
+    const cm=new BABYLON.StandardMaterial('plCm'+t,s);
+    cm.diffuseColor=new BABYLON.Color3(1,0.43,0);cm.specularColor=new BABYLON.Color3(0,0,0);
+    const sm=new BABYLON.StandardMaterial('plSm'+t,s);
+    sm.diffuseColor=new BABYLON.Color3(1,1,1);sm.specularColor=new BABYLON.Color3(0.15,0.15,0.15);
+    const bm=new BABYLON.StandardMaterial('plBm'+t,s);
+    bm.diffuseColor=new BABYLON.Color3(0.85,0.26,0.08);bm.specularColor=new BABYLON.Color3(0,0,0);
+    const base=BABYLON.MeshBuilder.CreateBox('plB',{width:0.25,depth:0.25,height:0.035},s);
+    base.parent=n;base.position.y=0.0175;base.material=bm;
+    const body=BABYLON.MeshBuilder.CreateCylinder('plC',{diameterTop:0.04,diameterBottom:0.19,height:0.45,tessellation:24},s);
+    body.parent=n;body.position.y=0.26;body.material=cm;
+    const st=BABYLON.MeshBuilder.CreateCylinder('plS',{diameterTop:0.10,diameterBottom:0.14,height:0.11,tessellation:24},s);
+    st.parent=n;st.position.y=0.255;st.material=sm;
+  }else{
+    const lm=new BABYLON.StandardMaterial('plLm'+t,s);
+    lm.diffuseColor=new BABYLON.Color3(1,1,1);lm.specularColor=new BABYLON.Color3(0.15,0.15,0.15);
+    const m=BABYLON.MeshBuilder.CreateBox('plL',{width:0.22,height:0.02,depth:0.8},s);
+    m.parent=n;m.position.set(0,0.01,0);m.material=lm;
+  }
+  n.parent=root;
+  panelLive.node=n;
+}
+function updatePanelLive(){
+  if(!panelLiveEnsure())return;
+  if(typeof editType==='undefined')return;
+  panelLiveBuild(editType);
+  const cv=document.getElementById('panelLiveCanvas');
+  const acc=document.getElementById('typeIco');
+  if(cv){cv.classList.add('on');}
+  if(acc)acc.style.display='none';
+  if(!panelLive.started){
+    panelLive.started=true;
+    panelLive.eng.runRenderLoop(()=>panelLive.scene.render());
+  }
+}
+function stopPanelLive(){
+  if(panelLive.eng&&panelLive.started){
+    panelLive.started=false;
+    panelLive.eng.stopRenderLoop();
+  }
+  const acc=document.getElementById('typeIco');
+  if(acc)acc.style.display='';
+  const cv=document.getElementById('panelLiveCanvas');
+  if(cv)cv.classList.remove('on');
+}
+function closeAllWindows(){openSettings(false);openMapEdit(false);openDecalWin(false);openMapWin(false);openTypeWin(false);}
 addEventListener('keydown',e=>{if(e.code==='Escape')closeAllWindows();});
 </script>
 <script src="editor.js"></script>

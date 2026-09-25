@@ -80,7 +80,7 @@ function makeLineSegment(a,b){
   return seg;
 }
 function updateLineCount(){if(countLinesEl)countLinesEl.textContent=markings.length;syncFinishBtn();}
-function syncFinishBtn(){if(finishLineBtn)finishLineBtn.style.display=(mode==='lines'&&openLine)?'':'none';}
+function syncFinishBtn(){if(finishLineBtn)finishLineBtn.style.display=(editType==='lines'&&mode==='place'&&openLine)?'':'none';}
 function updateLinePreview(){
   if(!openLine)return;
   const last=openLine.pts[openLine.pts.length-1];
@@ -167,18 +167,38 @@ preview.material=prevMat;preview.position.y=0.05;preview.isVisible=false;preview
 let mode='place',dragging=null,dragOldKey=null,conesEnabled=false;
 const hintline=document.getElementById('hintline');
 const HINTS={place:'Клик по площадке — поставить конус (шаг 0,25 м)',
-  move:'Зажми конус и перетащи в новый узел',delete:'Клик по конусу или линии — удалить',
-  lines:'Кликай по площадке: точки соединяются в белую линию. «Завершить линию» — начать новую'};
-const CURSORS={place:'crosshair',move:'grab',delete:'pointer',lines:'crosshair'};
+  move:'Зажми конус и перетащи в новый узел',delete:'Клик по конусу или линии — удалить'};
+const HINTS_LINES={place:'Кликай по площадке: точки соединяются в белую линию. «Завершить линию» — начать новую',
+  move:'Перемещение линий не поддерживается',delete:'Клик по линии — удалить'};
+const CURSORS={place:'crosshair',move:'grab',delete:'pointer'};
+let editType='cones';
+const editTypeSel=document.getElementById('editTypeSel');
+const typeIco=document.getElementById('typeIco');
+const TYPE_ICONS={
+  cones:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.6 15.8 21H8.2Z" fill="#ff8c3b" stroke="#1a1200" stroke-width="1.1" stroke-linejoin="round"/><ellipse cx="12" cy="14.4" rx="2.4" ry="1.1" fill="#fff" stroke="#1a1200" stroke-width=".8"/></svg>',
+  lines:'<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="10.3" width="4" height="1.7" rx=".85" fill="#fff"/><rect x="10" y="10.3" width="4" height="1.7" rx=".85" fill="#fff"/><rect x="17" y="10.3" width="4" height="1.7" rx=".85" fill="#fff"/></svg>'
+};
+function setEditType(t){
+  if(editType==='lines'&&t!=='lines')finishLine();
+  editType=t;
+  if(editTypeSel)editTypeSel.value=t;
+  if(typeIco)typeIco.innerHTML=(THUMBS[t]?'<img src="'+THUMBS[t]+'" alt="">':(TYPE_ICONS[t]||''));
+  if(t==='lines'&&mode==='move')setMode('place');
+  else setMode(mode);
+  if(typeof updatePanelLive==='function'&&typeof panelLive!=='undefined'&&panelLive.started)updatePanelLive();
+}
+if(editTypeSel){editTypeSel.addEventListener('change',()=>{if(!conesEnabled)return;setEditType(editTypeSel.value);});}
 function setMode(m){
-  if(mode==='lines'&&m!=='lines')finishLine();
+  finishLine();
   mode=m;
-  document.querySelectorAll('.modes button').forEach(b=>b.classList.toggle('active',b.dataset.mode===m));
-  hintline.textContent=HINTS[m];canvas.style.cursor=CURSORS[m];preview.isVisible=false;
+  document.querySelectorAll('#editModes button').forEach(b=>b.classList.toggle('active',b.dataset.mode===m));
+  hintline.textContent=editType==='lines'?HINTS_LINES[mode]:HINTS[mode];
+  canvas.style.cursor=CURSORS[mode];preview.isVisible=false;
+  document.getElementById('editModes').classList.toggle('lines',editType==='lines'&&mode==='move');
   syncFinishBtn();
 }
-document.querySelectorAll('.modes button').forEach(b=>b.addEventListener('click',()=>{if(!conesEnabled)return;setMode(b.dataset.mode)}));
-document.getElementById('clear').addEventListener('click',()=>{clearCones();clearLines();});
+document.querySelectorAll('#editModes button').forEach(b=>b.addEventListener('click',()=>{if(!conesEnabled)return;setMode(b.dataset.mode)}));
+document.getElementById('mapClearAll').addEventListener('click',()=>{clearCones();clearLines();});
 
 function carHits(px,pz){
   const dx=px-car.position.x,dz=pz-car.position.z;
@@ -252,11 +272,17 @@ scene.onPointerObservable.add(pi=>{const t=pi.type;
   if(!conesEnabled)return;
   if(t===BABYLON.PointerEventTypes.POINTERMOVE){
     const p=pickGround();
-    if(p.hit){const sx=snapX(p.pickedPoint.x),sz=snapZ(p.pickedPoint.z);
-      preview.position.set(sx,0.05,sz);preview.isVisible=(mode==='place')||!!dragging||mode==='lines';
-      if(dragging)dragging.position.set(sx,0,sz);}
-    else if(!dragging){preview.isVisible=false;hideLinePreview();}
-    if(mode==='lines')updateLinePreview();else hideLinePreview();}
+    if(p.hit){
+      const sx=snapX(p.pickedPoint.x),sz=snapZ(p.pickedPoint.z);
+      preview.position.set(sx,0.05,sz);
+      preview.isVisible=(mode==='place')||!!dragging;
+      if(dragging)dragging.position.set(sx,0,sz);
+      if(editType==='lines'&&mode==='place')updateLinePreview();else hideLinePreview();
+    }else{
+      preview.isVisible=false;
+      hideLinePreview();
+    }
+  }
   else if(t===BABYLON.PointerEventTypes.POINTERDOWN){
     if(mode==='move'){const c=pickCone();
       if(c.hit){dragging=c.pickedMesh.parent;const ud=dragging.userData;
@@ -264,7 +290,8 @@ scene.onPointerObservable.add(pi=>{const t=pi.type;
         if(ud.vel)ud.vel=null;
         dragging.rotationQuaternion=BABYLON.Quaternion.Identity();ud.knocked=false;
         dragOldKey=ud.cellKey;occupied.delete(dragOldKey);
-        camera.detachControl();canvas.style.cursor='grabbing';}}}
+        camera.detachControl();canvas.style.cursor='grabbing';}}
+  }
   else if(t===BABYLON.PointerEventTypes.POINTERUP){
     if(dragging){const x=snapX(dragging.position.x),z=snapZ(dragging.position.z),k=key(x,z);
       const ud=dragging.userData;
@@ -279,9 +306,13 @@ scene.onPointerObservable.add(pi=>{const t=pi.type;
       const c=pickCone();if(c.hit)deleteCone(c.pickedMesh.parent);
       else{const l=pickLine();if(l.hit)deletePolylineFromMesh(l.pickedMesh);}
     }
-    else if(mode==='place'){const p=pickGround();if(p.hit)addConeAt(snapX(p.pickedPoint.x),snapZ(p.pickedPoint.z));}
-    else if(mode==='lines'){const p=pickGround();if(p.hit)addLinePoint(snapX(p.pickedPoint.x),snapZ(p.pickedPoint.z));}}});
+    else if(mode==='place'){const p=pickGround();if(p.hit){
+      const px=snapX(p.pickedPoint.x),pz=snapZ(p.pickedPoint.z);
+      if(editType==='lines')addLinePoint(px,pz);else addConeAt(px,pz);}}
+  }
+});
 
+setEditType('cones');
 setMode('place');
 loadCones();
 loadMarkings();
@@ -289,10 +320,13 @@ loadMarkings();
 function setConesEnabled(on){
   if(!on)finishLine();
   conesEnabled=on;
-  document.querySelector('.modes').classList.toggle('disabled',!on);
+  document.querySelectorAll('.modes').forEach(el=>el.classList.toggle('disabled',!on));
+  if(editTypeSel){editTypeSel.disabled=!on;}
+  if(document.getElementById('editType'))document.getElementById('editType').classList.toggle('disabled',!on);
   preview.isVisible=false;
-  hintline.textContent=on?HINTS[mode]:'Режим редактирования карты выключен';
+  hintline.textContent=on?(editType==='lines'?HINTS_LINES[mode]:HINTS[mode]):'Режим редактирования карты выключен';
   if(on)setMode(mode);
 }
-document.querySelector('.modes').classList.add('disabled');
+document.querySelectorAll('.modes').forEach(el=>el.classList.add('disabled'));
+document.getElementById('editType').classList.add('disabled');
 hintline.textContent='Режим редактирования карты выключен';
