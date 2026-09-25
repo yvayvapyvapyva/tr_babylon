@@ -1,14 +1,17 @@
 /*
  * editor.js — модуль редактирования площадки: установка, перемещение и удаление
- * конусов, режимы, предпросмотр, сохранение и столкновения с машиной.
+ * конусов и разметки, режимы, палитра объектов (галерея и живые 3D-превью),
+ * джойстик перемещения камеры, окно настроек карты, сохранение и столкновения.
  *
  * Подключается классическим <script> ПОСЛЕ основного inline-скрипта index.html.
  * Классические скрипты делят глобальную лексическую область, поэтому:
- *   — читает из главного скрипта: scene, BABYLON, canvas, camera, shadowGen,
- *     car, CAR, heading, dragging, updateMirrorRenderList;
+ *   — читает из главного скрипта: scene, engine, BABYLON, canvas, camera, TERR,
+ *     car, CAR, heading, speed, grid, axes, openSettings, rebuildTerritory,
+ *     shadowGen, updateMirrorRenderList;
  *   — объявляет здесь общие состояния (coneNodes, occupied, mode, conesEnabled,
- *     preview) и функции (loadCones, setMode, clearCones, checkCollisions),
- *     которые главный скрипт использует из обработчиков клавиш и цикла рендера.
+ *     editType, panState, THUMBS ...) и функции (setMode, setEditType, panApply,
+ *     openMapEdit, openTypeWin, clearCones, checkCollisions ...), которые главный
+ *     скрипт вызывает из цикла рендера и closeAllWindows.
  */
 
 const STEP=0.25;
@@ -312,11 +315,6 @@ scene.onPointerObservable.add(pi=>{const t=pi.type;
   }
 });
 
-setEditType('cones');
-setMode('place');
-loadCones();
-loadMarkings();
-
 function setConesEnabled(on){
   if(!on)finishLine();
   conesEnabled=on;
@@ -330,3 +328,317 @@ function setConesEnabled(on){
 document.querySelectorAll('.modes').forEach(el=>el.classList.add('disabled'));
 document.getElementById('editType').classList.add('disabled');
 hintline.textContent='Режим редактирования карты выключен';
+
+// ════════════════════════════════════════════════════════════════════════════
+// Модуль редактора: окна, джойстик, миниатюры и живые 3D-превью.
+// Перенесено сюда из главного inline-скрипта index.html.
+// ════════════════════════════════════════════════════════════════════════════
+
+// ── Окно настроек карты ─────────────────────────────
+const mapWin=document.getElementById('mapWin');
+const mapBackdrop=document.getElementById('mapBackdrop');
+function openMapWin(o){mapWin.classList.toggle('open',o);mapBackdrop.classList.toggle('open',o);}
+document.getElementById('mapCfgBtn').addEventListener('click',()=>openMapWin(true));
+document.getElementById('mapCfgClose').addEventListener('click',()=>openMapWin(false));
+mapBackdrop.addEventListener('click',()=>openMapWin(false));
+
+// ── Включение/выключение режима редактирования ──────
+const mapBtn=document.getElementById('mapBtn');
+const mapEdit=document.getElementById('mapEdit');
+function openMapEdit(o){
+  document.body.classList.toggle('edit-mode',o);
+  mapEdit.classList.toggle('open',o);
+  setConesEnabled(o);
+  grid.isVisible=o;axes.isVisible=o;
+  if(o){updatePanelLive();}
+  else{stopPanelLive();}
+}
+mapBtn.addEventListener('click',()=>{
+  openSettings(false);
+  openMapEdit(true);
+});
+document.getElementById('mapDone').addEventListener('click',()=>openMapEdit(false));
+
+// ── Применение нового размера площадки ──────────────
+const terrWEl=document.getElementById('terrW'),terrDEl=document.getElementById('terrD');
+function syncTerrInputs(){if(terrWEl)terrWEl.value=TERR.w;if(terrDEl)terrDEl.value=TERR.d;}
+syncTerrInputs();
+if(document.getElementById('applyTerr'))document.getElementById('applyTerr').addEventListener('click',()=>{
+  rebuildTerritory(parseFloat(terrWEl.value),parseFloat(terrDEl.value));
+  syncTerrInputs();
+  openMapWin(false);
+});
+
+// ── Джойстик перемещения по карте (панорамирование камеры) ─────
+const PAN_SPEED=32;
+const panState={x:0,z:0};
+const joyBase=document.getElementById('joyBase'),joyKnob=document.getElementById('joyKnob');
+const JOY_R=30,JOY_RM=32;
+let joyActive=false,joyId=-1;
+function joySet(px,py){
+  const r=joyBase.getBoundingClientRect();
+  let dx=(px-(r.left+r.width/2))/JOY_RM,dy=(py-(r.top+r.height/2))/JOY_RM;
+  const L=Math.hypot(dx,dy);
+  if(L>1){dx/=L;dy/=L;}
+  panState.x=dx;panState.z=-dy;
+  joyKnob.style.transform='translate(calc(-50% + '+dx*JOY_R+'px),calc(-50% + '+dy*JOY_R+'px))';
+}
+function joyReset(){panState.x=0;panState.z=0;joyActive=false;joyId=-1;joyKnob.style.transform='translate(-50%,-50%)';joyBase.classList.remove('on');}
+if(joyBase){
+  joyBase.addEventListener('pointerdown',e=>{e.preventDefault();joyBase.setPointerCapture(e.pointerId);joyActive=true;joyId=e.pointerId;joyBase.classList.add('on');joySet(e.clientX,e.clientY);});
+  joyBase.addEventListener('pointermove',e=>{if(joyActive&&e.pointerId===joyId)joySet(e.clientX,e.clientY);});
+  joyBase.addEventListener('pointerup',e=>{if(e.pointerId===joyId)joyReset();});
+  joyBase.addEventListener('pointercancel',e=>{if(e.pointerId===joyId)joyReset();});
+}
+window.addEventListener('blur',joyReset);
+function panApply(dt){
+  if(!panState.x&&!panState.z)return;
+  const d=camera.position.subtract(camera.target);
+  const f=new BABYLON.Vector3(d.x,0,d.z);
+  if(f.lengthSquared()<1e-9)f.set(0,0,-1);
+  f.normalize();
+  const right=BABYLON.Vector3.Cross(new BABYLON.Vector3(0,1,0),f).normalize();
+  camera.target.addInPlace(right.scale(-panState.x*PAN_SPEED*dt).add(f.scale(-panState.z*PAN_SPEED*dt)));
+  const mx=TERR.w/2+15,mz=TERR.d/2+15;
+  camera.target.x=Math.max(-mx,Math.min(mx,camera.target.x));
+  camera.target.z=Math.max(-mz,Math.min(mz,camera.target.z));
+}
+
+// ── 3D-миниатюры типов объектов (рендер через RenderTargetTexture в сцене) ──
+const THUMBS={cones:null,lines:null};
+function thumbCluster(type){
+  const R=new BABYLON.TransformNode('thRoot'+type,scene);
+  R.position.set(-9999,0,0);
+  const cm=new BABYLON.StandardMaterial('thCone'+type,scene);
+  cm.diffuseColor=new BABYLON.Color3(1,0.43,0);cm.specularColor=new BABYLON.Color3(0,0,0);
+  const sm=new BABYLON.StandardMaterial('thStripe'+type,scene);
+  sm.diffuseColor=new BABYLON.Color3(1,1,1);sm.specularColor=new BABYLON.Color3(0.15,0.15,0.15);
+  const bm=new BABYLON.StandardMaterial('thBase'+type,scene);
+  bm.diffuseColor=new BABYLON.Color3(0.82,0.24,0.07);bm.specularColor=new BABYLON.Color3(0,0,0);
+  const gm=new BABYLON.StandardMaterial('thGround'+type,scene);
+  gm.diffuseColor=new BABYLON.Color3(0.17,0.18,0.21);gm.specularColor=new BABYLON.Color3(0,0,0);
+  const g=BABYLON.MeshBuilder.CreateGround('thG'+type,{width:2,height:2},scene);
+  g.parent=R;g.material=gm;
+  let cy=0.05;
+  if(type==='cones'){
+    cy=0.3;
+    const base=BABYLON.MeshBuilder.CreateBox('thB'+type,{width:0.25,depth:0.25,height:0.035},scene);
+    base.parent=R;base.position.y=0.0175;base.material=bm;
+    const body=BABYLON.MeshBuilder.CreateCylinder('thC'+type,{diameterTop:0.04,diameterBottom:0.19,height:0.45,tessellation:24},scene);
+    body.parent=R;body.position.y=0.26;body.material=cm;
+    const st=BABYLON.MeshBuilder.CreateCylinder('thS'+type,{diameterTop:0.10,diameterBottom:0.14,height:0.11,tessellation:24},scene);
+    st.parent=R;st.position.y=0.255;st.material=sm;
+  }else{
+    const m=BABYLON.MeshBuilder.CreateBox('thL'+type,{width:0.22,height:0.02,depth:0.8},scene);
+    m.parent=R;m.position.set(0,0.01,0);m.material=sm;
+  }
+  return{root:R,cy:cy};
+}
+function captureThumb(type){
+  try{
+    const{root,cy}=thumbCluster(type);
+    const cam=new BABYLON.ArcRotateCamera('thCam'+type,Math.PI/4,Math.PI/2.6,2.2,
+      new BABYLON.Vector3(-9999,cy,0),scene);
+    cam.lowerAlphaLimit=Math.PI/4;cam.upperAlphaLimit=Math.PI/4;
+    cam.lowerBetaLimit=Math.PI/2.6;cam.upperBetaLimit=Math.PI/2.6;
+    cam.lowerRadiusLimit=2.2;cam.upperRadiusLimit=2.2;
+    const W=256,H=256;
+    const rtt=new BABYLON.RenderTargetTexture('thRtt'+type,{width:W,height:H},scene,false);
+    rtt.activeCamera=cam;
+    rtt.renderList=root.getChildMeshes();
+    const oldClear=scene.clearColor.clone();
+    scene.clearColor=new BABYLON.Color4(0.05,0.086,0.125,1);
+    try{rtt.render();}catch(e1){}
+    scene.clearColor=oldClear;
+    try{
+      const buf=rtt.readPixels(0,0,W,H);
+      const clamped=new Uint8ClampedArray(buf.buffer,buf.byteOffset,buf.byteLength);
+      const ic=document.createElement('canvas');ic.width=W;ic.height=H;
+      const gc=ic.getContext('2d');
+      gc.putImageData(new ImageData(clamped,W,H),0,0);
+      THUMBS[type]=ic.toDataURL('image/png');
+    }catch(e2){}
+    rtt.dispose();cam.dispose();root.dispose();
+  }catch(e){}
+}
+// ── Живые 3D-предпросмотры в галерее объектов ───────────
+const livePreviews={};
+function ensureLivePreview(type){
+  if(livePreviews[type]!==undefined)return livePreviews[type];
+  livePreviews[type]=null;
+  try{
+    const card=document.querySelector('#typeWin .tg-card[data-type="'+type+'"]');
+    if(!card)return null;
+    const cv=card.querySelector('canvas');
+    if(!cv.getContext('webgl')&&!cv.getContext('experimental-webgl'))return null;
+    const eng=new BABYLON.Engine(cv,true);
+    const s=new BABYLON.Scene(eng);
+    s.clearColor=new BABYLON.Color4(0.05,0.086,0.125,1);
+    const h=new BABYLON.HemisphericLight('lvH'+type,new BABYLON.Vector3(0.5,1,0.4),s);h.intensity=0.9;
+    const d=new BABYLON.DirectionalLight('lvD'+type,new BABYLON.Vector3(-0.5,-1,-0.4),s);d.intensity=0.7;d.position=new BABYLON.Vector3(3,6,2);
+    const gm=new BABYLON.StandardMaterial('lvGm'+type,s);
+    gm.diffuseColor=new BABYLON.Color3(0.17,0.18,0.21);gm.specularColor=new BABYLON.Color3(0,0,0);
+    const g=BABYLON.MeshBuilder.CreateGround('lvG'+type,{width:2,height:2},s);g.material=gm;
+    const rot=new BABYLON.TransformNode('lvRot'+type,s);
+    let cy=0.08;
+    if(type==='cones'){
+      cy=0.35;
+      const cm=new BABYLON.StandardMaterial('lvCm'+type,s);
+      cm.diffuseColor=new BABYLON.Color3(1,0.43,0);cm.specularColor=new BABYLON.Color3(0,0,0);
+      const sm=new BABYLON.StandardMaterial('lvSm'+type,s);
+      sm.diffuseColor=new BABYLON.Color3(1,1,1);sm.specularColor=new BABYLON.Color3(0.15,0.15,0.15);
+      const bm=new BABYLON.StandardMaterial('lvBm'+type,s);
+      bm.diffuseColor=new BABYLON.Color3(0.82,0.24,0.07);bm.specularColor=new BABYLON.Color3(0,0,0);
+      const base=BABYLON.MeshBuilder.CreateBox('lvB'+type,{width:0.25,depth:0.25,height:0.035},s);
+      base.parent=rot;base.position.y=0.0175;base.material=bm;
+      const body=BABYLON.MeshBuilder.CreateCylinder('lvC'+type,{diameterTop:0.04,diameterBottom:0.19,height:0.45,tessellation:24},s);
+      body.parent=rot;body.position.y=0.26;body.material=cm;
+      const st=BABYLON.MeshBuilder.CreateCylinder('lvS'+type,{diameterTop:0.10,diameterBottom:0.14,height:0.11,tessellation:24},s);
+      st.parent=rot;st.position.y=0.255;st.material=sm;
+    }else{
+      const lm=new BABYLON.StandardMaterial('lvLm'+type,s);
+      lm.diffuseColor=new BABYLON.Color3(1,1,1);lm.specularColor=new BABYLON.Color3(0.15,0.15,0.15);
+      const m=BABYLON.MeshBuilder.CreateBox('lvL'+type,{width:0.22,height:0.02,depth:0.8},s);
+      m.parent=rot;m.position.set(0,0.01,0);m.material=lm;
+    }
+    rot.position.y=cy;
+    const cam=new BABYLON.ArcRotateCamera('lvC'+type,Math.PI/4,Math.PI/2.6,2.2,new BABYLON.Vector3(0,cy,0),s);
+    cam.lowerAlphaLimit=Math.PI/4;cam.upperAlphaLimit=Math.PI/4;
+    cam.lowerBetaLimit=Math.PI/2.6;cam.upperBetaLimit=Math.PI/2.6;
+    cam.lowerRadiusLimit=2.2;cam.upperRadiusLimit=2.2;
+    s.registerBeforeRender(()=>{rot.rotation.y+=0.016;});
+    livePreviews[type]={engine:eng,scene:s,canvas:cv,card:card};
+  }catch(e){livePreviews[type]=null;}
+  return livePreviews[type];
+}
+function startLive(type){
+  const p=ensureLivePreview(type);if(!p)return;
+  p.canvas.classList.add('on');
+  const fb=p.card?p.card.querySelector('.tg-fallback'):null;if(fb)fb.style.display='none';
+  p.engine.runRenderLoop(()=>p.scene.render());
+}
+function stopLive(type){
+  const p=livePreviews[type];
+  if(p){p.engine.stopRenderLoop();p.canvas.classList.remove('on');
+    const fb=p.card?p.card.querySelector('.tg-fallback'):null;if(fb)fb.style.display='';}
+}
+function applyThumbs(){
+  const fill=(el,type)=>{if(el&&THUMBS[type])el.innerHTML='<img src="'+THUMBS[type]+'" alt="">';};
+  if(typeof typeIco!=='undefined'&&typeIco)fill(typeIco,editType);
+  document.querySelectorAll('#typeWin .tg-card').forEach(c=>{const ico=c.querySelector('.tg-fallback');fill(ico,c.dataset.type);});
+}
+requestAnimationFrame(()=>requestAnimationFrame(()=>{
+  try{captureThumb('cones');captureThumb('lines');applyThumbs();}catch(e){}
+}));
+
+// ── Окно-галерея объектов ───────────────────────────
+const typeWin=document.getElementById('typeWin');
+const typeBackdrop=document.getElementById('typeBackdrop');
+function openTypeWin(o){
+  typeWin.classList.toggle('open',o);
+  typeBackdrop.classList.toggle('open',o);
+  if(o){startLive('cones');startLive('lines');}
+  else{stopLive('cones');stopLive('lines');}
+}
+document.getElementById('editTypeBtn').addEventListener('click',()=>{if(!conesEnabled)return;openTypeWin(true);});
+document.getElementById('typeClose').addEventListener('click',()=>openTypeWin(false));
+typeBackdrop.addEventListener('click',()=>openTypeWin(false));
+document.querySelectorAll('#typeWin .tg-card').forEach(c=>c.addEventListener('click',()=>{
+  if(!conesEnabled)return;
+  setEditType(c.dataset.type);
+  openTypeWin(false);
+}));
+
+// ── Живой 3D-предпросмотр в кнопке панели редактора ─────
+const panelLive={eng:null,scene:null,root:null,node:null,started:false};
+function panelLiveEnsure(){
+  if(panelLive.eng)return true;
+  try{
+    const cv=document.getElementById('panelLiveCanvas');
+    if(!cv)return false;
+    if(!cv.getContext('webgl')&&!cv.getContext('experimental-webgl'))return false;
+    const eng=new BABYLON.Engine(cv,true);
+    const s=new BABYLON.Scene(eng);
+    s.clearColor=new BABYLON.Color4(0.06,0.1,0.14,0);
+    const h=new BABYLON.HemisphericLight('plH',new BABYLON.Vector3(0.5,1,0.4),s);h.intensity=0.9;
+    const d=new BABYLON.DirectionalLight('plD',new BABYLON.Vector3(-0.5,-1,-0.4),s);d.intensity=0.7;d.position=new BABYLON.Vector3(3,6,2);
+    const gm=new BABYLON.StandardMaterial('plGm',s);
+    gm.diffuseColor=new BABYLON.Color3(0.17,0.18,0.21);gm.specularColor=new BABYLON.Color3(0,0,0);
+    const g=BABYLON.MeshBuilder.CreateGround('plG',{width:2,height:2},s);g.material=gm;
+    const root=new BABYLON.TransformNode('plRoot',s);
+    const cam=new BABYLON.ArcRotateCamera('plC',Math.PI/4,Math.PI/2.6,2.2,new BABYLON.Vector3(0,0.3,0),s);
+    cam.lowerAlphaLimit=Math.PI/4;cam.upperAlphaLimit=Math.PI/4;
+    cam.lowerBetaLimit=Math.PI/2.6;cam.upperBetaLimit=Math.PI/2.6;
+    cam.lowerRadiusLimit=2.2;cam.upperRadiusLimit=2.2;
+    s.registerBeforeRender(()=>{root.rotation.y+=0.02;});
+    panelLive.eng=eng;panelLive.scene=s;panelLive.root=root;
+  }catch(e){return false;}
+  return true;
+}
+function panelLiveBuild(t){
+  if(!panelLive.scene)return;
+  const s=panelLive.scene,root=panelLive.root;
+  if(panelLive.node){const old=panelLive.node;panelLive.node=null;old.dispose();}
+  const n=new BABYLON.TransformNode('plNode'+t,s);
+  if(t==='cones'){
+    const cm=new BABYLON.StandardMaterial('plCm'+t,s);
+    cm.diffuseColor=new BABYLON.Color3(1,0.43,0);cm.specularColor=new BABYLON.Color3(0,0,0);
+    const sm=new BABYLON.StandardMaterial('plSm'+t,s);
+    sm.diffuseColor=new BABYLON.Color3(1,1,1);sm.specularColor=new BABYLON.Color3(0.15,0.15,0.15);
+    const bm=new BABYLON.StandardMaterial('plBm'+t,s);
+    bm.diffuseColor=new BABYLON.Color3(0.85,0.26,0.08);bm.specularColor=new BABYLON.Color3(0,0,0);
+    const base=BABYLON.MeshBuilder.CreateBox('plB',{width:0.25,depth:0.25,height:0.035},s);
+    base.parent=n;base.position.y=0.0175;base.material=bm;
+    const body=BABYLON.MeshBuilder.CreateCylinder('plC',{diameterTop:0.04,diameterBottom:0.19,height:0.45,tessellation:24},s);
+    body.parent=n;body.position.y=0.26;body.material=cm;
+    const st=BABYLON.MeshBuilder.CreateCylinder('plS',{diameterTop:0.10,diameterBottom:0.14,height:0.11,tessellation:24},s);
+    st.parent=n;st.position.y=0.255;st.material=sm;
+  }else{
+    const lm=new BABYLON.StandardMaterial('plLm'+t,s);
+    lm.diffuseColor=new BABYLON.Color3(1,1,1);lm.specularColor=new BABYLON.Color3(0.15,0.15,0.15);
+    const m=BABYLON.MeshBuilder.CreateBox('plL',{width:0.22,height:0.02,depth:0.8},s);
+    m.parent=n;m.position.set(0,0.01,0);m.material=lm;
+  }
+  n.parent=root;
+  panelLive.node=n;
+}
+function updatePanelLive(){
+  if(!panelLiveEnsure())return;
+  if(typeof editType==='undefined')return;
+  panelLiveBuild(editType);
+  const cv=document.getElementById('panelLiveCanvas');
+  const acc=document.getElementById('typeIco');
+  if(cv){cv.classList.add('on');}
+  if(acc)acc.style.display='none';
+  if(!panelLive.started){
+    panelLive.started=true;
+    panelLive.eng.runRenderLoop(()=>panelLive.scene.render());
+  }
+}
+function stopPanelLive(){
+  if(panelLive.eng&&panelLive.started){
+    panelLive.started=false;
+    panelLive.eng.stopRenderLoop();
+  }
+  const acc=document.getElementById('typeIco');
+  if(acc)acc.style.display='';
+  const cv=document.getElementById('panelLiveCanvas');
+  if(cv)cv.classList.remove('on');
+}
+
+// ── Горячие клавиши редактора: 1/2/3, T (тип), C (очистить) ──
+addEventListener('keydown',e=>{
+  if(e.target.tagName==='INPUT')return;
+  if(!conesEnabled&&(e.code==='Digit1'||e.code==='Digit2'||e.code==='Digit3'||e.code==='KeyT'||e.code==='KeyC')){e.preventDefault();return;}
+  if(e.code==='Digit1')setMode('place');
+  else if(e.code==='Digit2')setMode('move');
+  else if(e.code==='Digit3')setMode('delete');
+  else if(e.code==='KeyT')setEditType(editType==='lines'?'cones':'lines');
+  else if(e.code==='KeyC')clearCones();
+});
+
+// ── Инициализация ───────────────────────────────────
+setEditType('cones');
+setMode('place');
+loadCones();
+loadMarkings();
