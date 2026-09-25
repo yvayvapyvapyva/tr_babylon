@@ -96,10 +96,19 @@ function updateMirrorPlane(tex,mesh,localN){
 }
 
 function mirrorRenderFilter(){
-  return scene.meshes.filter(m=>{
+  // Зеркалу нужны только ближние объекты: сама машина, асфальт,
+  // конусы и линии разметки. Всё остальное (городская земля, забор,
+  // солнце, небо) не рендерим — это в сотни раз дешевле полной сцены.
+  const isCarChild=m=>{let p=m.parent;while(p){if(p===car)return true;p=p.parent;}return false;};
+  const res=[];
+  for(const m of scene.meshes){
     const mn=m.name.toLowerCase();
-    return !mn.includes('mirror')&&!mn.includes('mirblink')&&!mn.includes('_pivot');
-  });
+    if(mn.includes('mirror')||mn.includes('mirblink')||mn.includes('_pivot'))continue;
+    if(m.metadata&&(m.metadata.isCone||m.metadata.isLine)){res.push(m);continue;}
+    if(m.name==='ground'){res.push(m);continue;}
+    if(isCarChild(m)){res.push(m);}
+  }
+  return res;
 }
 
 function loadMirrorAngles(){
