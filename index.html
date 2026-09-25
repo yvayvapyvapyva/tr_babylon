@@ -1291,9 +1291,12 @@ addEventListener('pointermove',e=>{
     let mx=e.movementX||0,my=e.movementY||0;
     if(!mx&&!my&&lastPtr){mx=e.clientX-lastPtr.x;my=e.clientY-lastPtr.y;}
     lastPtr={x:e.clientX,y:e.clientY};
-    headYaw-=mx*0.005;
+    const cw=canvas.clientWidth||1,ch=canvas.clientHeight||1;
+    const fv=cabCam&&cabCam.fov?cabCam.fov:85*Math.PI/180;
+    const fh=2*Math.atan(Math.tan(fv/2)*(cw/ch));
+    headYaw-=mx*(fh/cw);
     if(headYaw>Math.PI)headYaw-=Math.PI*2;if(headYaw<-Math.PI)headYaw+=Math.PI*2;
-    headPitch+=my*0.005;
+    headPitch+=my*(fv/ch);
     headPitch=Math.max(-0.349,Math.min(0.349,headPitch));
   }
 });
