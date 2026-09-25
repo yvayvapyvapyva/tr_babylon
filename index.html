@@ -745,6 +745,7 @@ let car=null,steerPivots=[],spinPivots=[],primitiveRoot=null,modelCarRoot=null;
 let cabMode=false;const cabMats=new Map();
 let camFollow=true;
 let headYaw=0,headPitch=0,headTurn=false;
+const cfgTouches=new Map();let pinchActive=false,pinchDist=0,pinchFov0=0;
 let carHeight=CAR.height;
 let steeringWheelNode=null,steeringBaseQuat=null,steeringLocalAxis=null,blinkTimer=0;
 
@@ -1236,6 +1237,8 @@ camFollowBtn.addEventListener('click',()=>{camFollow=!camFollow;syncCamFollowBtn
 syncCamFollowBtn();
 
 canvas.addEventListener('pointerdown',e=>{
+  if(e.target!==canvas)return;
+  cfgTouches.set(e.pointerId,{x:e.clientX,y:e.clientY});
   if(pickMode){
     const r=canvas.getBoundingClientRect();
     const hit=scene.pick(e.clientX-r.left,e.clientY-r.top,
@@ -1254,13 +1257,37 @@ canvas.addEventListener('pointerdown',e=>{
     if(h)h.textContent='Выбрана деталь: '+desc;
     return;
   }
-  if(cabMode&&!dragging){headTurn=true;lastPtr={x:e.clientX,y:e.clientY};}
+  if(cabMode&&!dragging){
+    if(cfgTouches.size===2){
+      headTurn=false;
+      const pts=[...cfgTouches.values()];
+      pinchDist=Math.hypot(pts[0].x-pts[1].x,pts[0].y-pts[1].y);
+      pinchFov0=cabFovDeg;
+      pinchActive=true;
+    }else{headTurn=true;lastPtr={x:e.clientX,y:e.clientY};}
+  }
 });
-addEventListener('pointerup',()=>{headTurn=false;});
-addEventListener('pointercancel',()=>{headTurn=false;});
-addEventListener('blur',()=>{headTurn=false;});
+function clearPinch(e){cfgTouches.delete(e.pointerId);if(cfgTouches.size<2){pinchActive=false;pinchDist=0;}}
+addEventListener('pointerup',e=>{clearPinch(e);headTurn=false;lastPtr=null;});
+addEventListener('pointercancel',e=>{clearPinch(e);headTurn=false;lastPtr=null;});
+addEventListener('blur',()=>{headTurn=false;pinchActive=false;pinchDist=0;cfgTouches.clear();});
 let lastPtr=null;
 addEventListener('pointermove',e=>{
+  if(pinchActive&&cfgTouches.has(e.pointerId)){
+    cfgTouches.set(e.pointerId,{x:e.clientX,y:e.clientY});
+    if(cfgTouches.size===2){
+      const pts=[...cfgTouches.values()];
+      const d=Math.hypot(pts[0].x-pts[1].x,pts[0].y-pts[1].y);
+      if(pinchDist>0&&d>0){
+        cabFovDeg=Math.max(40,Math.min(120,pinchFov0*pinchDist/d));
+        applyCabFov();
+        if(fovEl)fovEl.value=cabFovDeg;
+        if(fovValEl)fovValEl.textContent=Math.round(cabFovDeg)+'°';
+      }
+      pinchDist=d;
+    }
+    return;
+  }
   if(cabMode&&headTurn&&!dragging){
     let mx=e.movementX||0,my=e.movementY||0;
     if(!mx&&!my&&lastPtr){mx=e.clientX-lastPtr.x;my=e.clientY-lastPtr.y;}
