@@ -212,6 +212,13 @@
 <script src="https://cdn.babylonjs.com/loaders/babylonjs.loaders.min.js"></script>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <script>
+function resizeEngine(){
+  try{
+    if(typeof engine==='undefined'||!engine||!engine.resize)return;
+    engine.resize();
+    requestAnimationFrame(()=>{if(engine&&engine.resize)engine.resize();});
+  }catch(e){}
+}
 function tgFullscreen(){
   try{
     if(!window.Telegram||!Telegram.WebApp)return;
@@ -221,8 +228,13 @@ function tgFullscreen(){
     if(Telegram.WebApp.setBackgroundColor)Telegram.WebApp.setBackgroundColor('#111213');
     if(Telegram.WebApp.disableVerticalSwipes)Telegram.WebApp.disableVerticalSwipes();
     if(Telegram.WebApp.requestFullscreen)Telegram.WebApp.requestFullscreen();
+    resizeEngine();
   }catch(e){}
+  requestAnimationFrame(resizeEngine);
 }
+window.addEventListener('resize',resizeEngine);
+document.addEventListener('fullscreenchange',resizeEngine);
+if(window.Telegram&&Telegram.WebApp&&Telegram.WebApp.onEvent)Telegram.WebApp.onEvent('viewportChanged',resizeEngine);
 tgFullscreen();
 document.addEventListener('DOMContentLoaded',tgFullscreen);
 window.addEventListener('load',tgFullscreen);
