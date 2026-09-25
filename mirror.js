@@ -16,6 +16,15 @@
 
 // ── ОТРАЖЕНИЯ И РЕГУЛИРОВКА ЗЕРКАЛ ────────────────────────
 let leftMirrorTex=null,rightMirrorTex=null,rearMirrorTex=null;
+let mirrorsActive=false;
+function setMirrorActive(on){
+  mirrorsActive=!!on;
+  mirrorEntries.forEach(en=>{
+    if(!en.mat)return;
+    if(mirrorsActive&&en.tex){en.mat.reflectionTexture=en.tex;en.mat.reflectionTexture.level=1.0;}
+    else en.mat.reflectionTexture=null;
+  });
+}
 const mirrorUpdaters=[];
 const mirrorEntries=[];
 let leftMirrorPivot=null,rightMirrorPivot=null;
@@ -249,8 +258,7 @@ function setupMirrorReflections(modelRoot){
     mat.emissiveColor = new BABYLON.Color3(0, 0, 0);
     mat.ambientColor = new BABYLON.Color3(0.1, 0.1, 0.1);
     // Отражение без fresnel — поверхность ровная, без искажений
-    mat.reflectionTexture = tex;
-    mat.reflectionTexture.level = 1.0;
+    if(mirrorsActive){mat.reflectionTexture = tex;mat.reflectionTexture.level = 1.0;}
     mat.backFaceCulling = false;
     mesh.material = mat;
     updateMirrorPlane(tex, mesh, localN);
@@ -278,7 +286,7 @@ function setMirrorQuality(size){
     const tex=new BABYLON.MirrorTexture(en.key+'_mirrorTex',size,scene,true);
     tex.renderList=mirrorRenderFilter();
     en.tex=tex;
-    if(en.mat){en.mat.reflectionTexture=tex;en.mat.reflectionTexture.level=1.0;}
+    if(en.mat){if(mirrorsActive){en.mat.reflectionTexture=tex;en.mat.reflectionTexture.level=1.0;}else en.mat.reflectionTexture=null;}
     if(en.key==='left')leftMirrorTex=tex;
     else if(en.key==='right')rightMirrorTex=tex;
     else rearMirrorTex=tex;

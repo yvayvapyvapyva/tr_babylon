@@ -443,112 +443,12 @@ groundMat.diffuseTexture.level=1;
 groundMat.specularColor=new BABYLON.Color3(0,0,0);
 ground.material=groundMat;ground.receiveShadows=true;
 
-// ── фоновый город вокруг территории (кварталы, улицы, этажность) ──
-const CITY_HALF=1000,BLOCK=72,STREET=26,PITCH=BLOCK+STREET;
-function hash2(x,z){let h=Math.imul(x,374761393)+Math.imul(z,668265263)|0;
-  h=Math.imul(h^(h>>>13),1274126177);return((h^(h>>>16))>>>0)/4294967295;}
-function vnoise(x,z){const ix=Math.floor(x),iz=Math.floor(z),fx=x-ix,fz=z-iz;
-  const s=t=>t*t*(3-2*t),u=s(fx),v=s(fz);
-  const a=hash2(ix,iz),b=hash2(ix+1,iz),c=hash2(ix,iz+1),d=hash2(ix+1,iz+1);
-  return a+(b-a)*u+(c-a)*v+(a-b-c+d)*u*v;}
-// расположение без произвольных вращений, но с ними надо осторожно
-const cityGround=BABYLON.MeshBuilder.CreateGround('cityGround',{width:CITY_HALF*2,height:CITY_HALF*2},scene);
-const cityTex=new BABYLON.DynamicTexture('cityTex',{width:1024,height:1024},scene,false);
-const cctx=cityTex.getContext();
-const pxm=m=>m*1024/(CITY_HALF*2);
-cctx.fillStyle='#26282d';cctx.fillRect(0,0,1024,1024);
-for(let i=0;i<140;i++){
-  const x=Math.random()*1024,y=Math.random()*1024,r=2+Math.random()*8,v=42+Math.random()*38;
-  cctx.fillStyle='rgba('+v+','+v+','+v+',0.5)';
-  cctx.beginPath();cctx.arc(x,y,r,0,Math.PI*2);cctx.fill();
-}
-cctx.strokeStyle='#3d434b';cctx.lineWidth=Math.max(2,pxm(STREET));
-for(let t=0;t<CITY_HALF;t+=PITCH){
-  const p=pxm(t)+pxm(STREET)/2;
-  cctx.beginPath();cctx.moveTo(pxm(-CITY_HALF),p);cctx.lineTo(pxm(CITY_HALF),p);cctx.stroke();
-  cctx.beginPath();cctx.moveTo(p,pxm(-CITY_HALF));cctx.lineTo(p,pxm(CITY_HALF));cctx.stroke();
-}
-cityTex.update();
-cityTex.wrapU=cityTex.wrapV=BABYLON.Texture.WRAP_ADDRESSMODE;
+// ── земля вокруг территории ─────────────────────────────────
+const cityGround=BABYLON.MeshBuilder.CreateGround('cityGround',{width:2000,height:2000},scene);
 const cityGroundMat=new BABYLON.StandardMaterial('cgmat',scene);
-cityGroundMat.diffuseColor=new BABYLON.Color3(1,1,1);
-cityGroundMat.diffuseTexture=cityTex;
-cityGroundMat.diffuseTexture.level=1;
+cityGroundMat.diffuseColor=new BABYLON.Color3(0.16,0.18,0.21);
 cityGroundMat.specularColor=new BABYLON.Color3(0,0,0);
 cityGround.material=cityGroundMat;cityGround.position.y=-0.05;cityGround.isPickable=false;
-let buildings=[];
-const cityMatPool=[[0.58,0.60,0.64],[0.66,0.64,0.60],[0.50,0.54,0.60],[0.62,0.57,0.53],[0.56,0.60,0.64],[0.70,0.71,0.72],
-  [0.44,0.48,0.54],[0.60,0.62,0.58]]
-  .map((c,i)=>{const m=new BABYLON.StandardMaterial('bmat'+i,scene);
-    m.diffuseColor=new BABYLON.Color3(c[0],c[1],c[2]);
-    m.specularColor=new BABYLON.Color3(0.12,0.12,0.12);m.specularPower=16;
-    m.backFaceCulling=true;return m;});
-const winMat=new BABYLON.StandardMaterial('winMat',scene);
-winMat.diffuseColor=new BABYLON.Color3(0.70,0.80,0.92);
-winMat.emissiveColor=new BABYLON.Color3(0.25,0.35,0.50);
-winMat.emissiveIntensity=0.9;
-winMat.specularColor=new BABYLON.Color3(0,0,0);
-winMat.backFaceCulling=false;
-function makeTree(x,z){const n=new BABYLON.TransformNode('tree',scene);
-  const trunk=BABYLON.MeshBuilder.CreateCylinder('tr',{diameter:0.4,height:2.4,segments:6},scene);
-  trunk.parent=n;trunk.position.y=1.2;trunk.material=trunkMat;
-  const crown=BABYLON.MeshBuilder.CreateSphere('cr',{diameter:4.2,segments:8},scene);
-  crown.parent=n;crown.position.y=3.8;crown.material=foliageMat;
-  n.position.set(x,0,z);n.isPickable=false;return n;}
-const trunkMat=new BABYLON.StandardMaterial('trunkMat',scene);
-trunkMat.diffuseColor=new BABYLON.Color3(0.35,0.26,0.16);trunkMat.specularColor=new BABYLON.Color3(0,0,0);
-const foliageMat=new BABYLON.StandardMaterial('folMat',scene);
-foliageMat.diffuseColor=new BABYLON.Color3(0.22,0.42,0.20);foliageMat.specularColor=new BABYLON.Color3(0,0,0);
-function buildCity(){
-  buildings.forEach(b=>{try{b.dispose();}catch(e){}});
-  buildings=[];
-  const hw=TERR.w/2,hd=TERR.d/2;
-  const minDist=Math.max(hw,hd)+70;
-  const maxOut=620;
-  const NN=Math.ceil((minDist+maxOut)/PITCH);
-  const rnd=(a,b)=>a+Math.random()*(b-a);
-  const dens=isMobile?0.7:1;
-  const floorH=3.6;
-  for(let iz=-NN;iz<=NN;iz++){
-    for(let ix=-NN;ix<=NN;ix++){
-      const bx=ix*PITCH+PITCH/2,bz=iz*PITCH+PITCH/2;
-      const dist=Math.hypot(bx,bz);
-      if(dist-BLOCK*0.71/2<minDist)continue;
-      if(dist-BLOCK*0.71/2>maxOut)continue;
-      const district=vnoise(bx*0.006+7.3,bz*0.006+2.1);
-      const park=vnoise(bx*0.013+4.7,bz*0.013+9.2);
-      if(park>0.90){ // парковый квартал: деревья, без домов
-        if(Math.random()<dens*0.7){for(let i=0;i<4;i++)buildings.push(makeTree(bx+rnd(-BLOCK/2+4,BLOCK/2-4),bz+rnd(-BLOCK/2+4,BLOCK/2-4)));}
-        continue;}
-      let baseFloors;
-      if(district<0.3)baseFloors=2;
-      else if(district<0.55)baseFloors=5;
-      else if(district<0.8)baseFloors=9;
-      else baseFloors=15;
-      const perRows=Math.floor(district*8)%2; // лёгкая «волна» скверов внутри квартала
-      for(let sr=0;sr<2;sr++){
-        for(let sc=0;sc<2;sc++){
-          const cx=bx-BLOCK/4+sc*BLOCK/2,cz=bz-BLOCK/4+sr*BLOCK/2;
-          const cell=vnoise(cx*0.05+sr*31,cz*0.05+sc*57);
-          if(cell>0.78*dens){ // внутриквартальный двор без здания
-            if(Math.random()<dens*0.8)buildings.push(makeTree(cx+rnd(-3,3),cz+rnd(-3,3)));
-            continue;}
-          const floors=baseFloors+Math.round(rnd(0,baseFloors<4?3:5));
-          const h=floors*floorH;
-          const w=baseFloors>=15?rnd(18,24):rnd(24,31);
-          const d=baseFloors>=15?rnd(18,24):rnd(24,31);
-          const b=BABYLON.MeshBuilder.CreateBox('bld',{width:w,height:h,depth:d},scene);
-          b.position.set(cx+rnd(-0.8,0.8),h/2,cz+rnd(-0.8,0.8));
-          b.rotation.y=(Math.random()<0.5?0:Math.PI/2)+(Math.random()-0.5)*0.06;
-          b.material=cityMatPool[Math.floor(Math.random()*cityMatPool.length)];
-          b.isPickable=false;
-          buildings.push(b);
-        }
-      }
-    }
-  }
-}
-buildCity();
 
 // ── бордюр по периметру территории ─────────────────────────
 const curbMat=new BABYLON.StandardMaterial('curbMat',scene);
@@ -654,7 +554,6 @@ function rebuildTerritory(w,d){
   buildCurbs();
   buildFenceAll();
   buildGridAxes();
-  buildCity();
   if(typeof setTerritoryLimits==='function')setTerritoryLimits(TERR.w/2,TERR.d/2);
   saveTerritory();
   if(typeof updateMirrorRenderList==='function')updateMirrorRenderList();
@@ -1077,6 +976,7 @@ function setCabMode(b){
   cabBtn.classList.toggle('active',b);
   scene.activeCamera=b?cabCam:camera;
   if(typeof setMirrorQuality==='function')setMirrorQuality(b?(isMobile?2048:2048):(isMobile?256:1024));
+  if(typeof setMirrorActive==='function')setMirrorActive(b);
   if(b){camera.detachControl();applyCabMaterials(true);}
   else{applyCabMaterials(false);camera.detachControl();camera.attachControl(canvas,true);}
   syncDvView();
