@@ -133,8 +133,6 @@
   .me-type-thumb .t-ico{width:108px;height:108px}
   .me-type-thumb .t-ico img{width:100%;height:100%;object-fit:contain;border-radius:8px}
   .me-type-thumb .tv-wrap{position:relative;width:108px;height:108px;display:inline-flex;align-items:center;justify-content:center;overflow:hidden;border-radius:8px}
-  .me-type-thumb .me-type-canvas{position:absolute;inset:0;width:100%;height:100%;display:none;border-radius:6px}
-  .me-type-thumb .me-type-canvas.on{display:block}
   .me-type.disabled .me-type-thumb{opacity:.45;pointer-events:none}
   .tg-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
   .tg-card{display:flex;flex-direction:column;align-items:center;gap:8px;padding:12px 8px;background:#1c2c3a;
@@ -146,8 +144,6 @@
   .tg-card .t-ico svg{width:100%;height:100%}
   .tg-card .tg-lbl{margin-top:2px}
   .tv-wrap{position:relative;width:100%;height:96px;display:flex;align-items:center;justify-content:center;box-sizing:border-box}
-  .tg-canvas{position:absolute;inset:0;width:100%;height:100%;display:none;border-radius:8px}
-  .tg-canvas.on{display:block}
   .tg-fallback{width:100%;height:100%}
   .tg-fallback img{width:100%;height:100%;object-fit:contain;border-radius:8px}
   .cone-toggle{font-size:12px;color:#9db4c4;margin-bottom:8px;user-select:none;cursor:pointer}
@@ -331,7 +327,6 @@ document.addEventListener('pointerdown',tgFullscreen,{once:true});
     </select>
     <button class="me-type-thumb" id="editTypeBtn" aria-label="Выбрать объект">
       <span class="tv-wrap me-type-wrap">
-        <canvas class="me-type-canvas" id="panelLiveCanvas" width="108" height="108"></canvas>
         <span class="t-ico" id="typeIco"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.6 15.8 21H8.2Z" fill="#ff8c3b" stroke="#1a1200" stroke-width="1.1" stroke-linejoin="round"/><ellipse cx="12" cy="14.4" rx="2.4" ry="1.1" fill="#fff" stroke="#1a1200" stroke-width=".8"/></svg></span>
       </span>
       <span class="t-caret">▾</span>
@@ -519,35 +514,30 @@ document.addEventListener('pointerdown',tgFullscreen,{once:true});
   <div class="sw-body tg-grid">
     <button class="tg-card" data-type="cones">
       <div class="tv-wrap">
-        <canvas class="tg-canvas" width="140" height="140"></canvas>
         <span class="t-ico tg-fallback"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.6 15.8 21H8.2Z" fill="#ff8c3b" stroke="#1a1200" stroke-width="1.1" stroke-linejoin="round"/><ellipse cx="12" cy="14.4" rx="2.4" ry="1.1" fill="#fff" stroke="#1a1200" stroke-width=".8"/></svg></span>
       </div>
       <span class="tg-lbl">Конус</span>
     </button>
     <button class="tg-card" data-type="lines">
       <div class="tv-wrap">
-        <canvas class="tg-canvas" width="140" height="140"></canvas>
         <span class="t-ico tg-fallback"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="10.3" width="4" height="1.7" rx=".85" fill="#fff"/><rect x="10" y="10.3" width="4" height="1.7" rx=".85" fill="#fff"/><rect x="17" y="10.3" width="4" height="1.7" rx=".85" fill="#fff"/></svg></span>
       </div>
       <span class="tg-lbl">Разметка</span>
     </button>
     <button class="tg-card" data-type="curb">
       <div class="tv-wrap">
-        <canvas class="tg-canvas" width="140" height="140"></canvas>
         <span class="t-ico tg-fallback"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="8.6" width="19" height="5.6" rx="1.2" fill="#fff" stroke="#22303a" stroke-width="1"/><rect x="2.5" y="14.2" width="19" height="1.8" rx=".9" fill="#e8eaed" stroke="#22303a" stroke-width=".8"/></svg></span>
       </div>
       <span class="tg-lbl">Бордюр</span>
     </button>
     <button class="tg-card" data-type="fence">
       <div class="tv-wrap">
-        <canvas class="tg-canvas" width="140" height="140"></canvas>
         <span class="t-ico tg-fallback"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="14" y="5" width="2" height="16" rx=".6" fill="#6a7075" stroke="#22303a" stroke-width=".8"/><rect x="18.5" y="5" width="2" height="16" rx=".6" fill="#6a7075" stroke="#22303a" stroke-width=".8"/><rect x="3" y="7" width="17.4" height="1.8" rx=".9" fill="#f2f4f6" stroke="#22303a" stroke-width=".7"/><rect x="3" y="14" width="17.4" height="1.8" rx=".9" fill="#f2f4f6" stroke="#22303a" stroke-width=".7"/></svg></span>
       </div>
       <span class="tg-lbl">Забор</span>
     </button>
     <button class="tg-card" data-type="estacada">
       <div class="tv-wrap">
-        <canvas class="tg-canvas" width="140" height="140"></canvas>
         <span class="t-ico tg-fallback"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2.8 18.5 7.5 11h9l4.7 7.5" fill="none" stroke="#9db4c4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><line x1="2.8" y1="18.5" x2="21.2" y2="18.5" stroke="#7c93a4" stroke-width="1.6"/></svg></span>
       </div>
       <span class="tg-lbl">Эстакада</span>

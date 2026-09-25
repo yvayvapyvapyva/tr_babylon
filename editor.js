@@ -1,7 +1,8 @@
 /*
  * editor.js — модуль редактирования площадки: установка, перемещение и удаление
- * конусов и разметки, режимы, палитра объектов (галерея и живые 3D-превью),
- * джойстик перемещения камеры, окно настроек карты, сохранение и столкновения.
+ * конусов и разметки, режимы, палитра объектов (галерея и статичные 3D-превью),
+ * джойстик перемещения камеры, окно настроек карты, файлы карты, сохранение
+ * и столкновения.
  *
  * Подключается классическим <script> ПОСЛЕ основного inline-скрипта index.html.
  * Классические скрипты делят глобальную лексическую область, поэтому:
@@ -420,7 +421,6 @@ function setEditType(t){
   if(typeName)typeName.textContent=TYPE_NAMES[t]||t;
   if(t!=='cones'&&mode==='move')setMode('place');
   else setMode(mode);
-  if(typeof updatePanelLive==='function'&&typeof panelLive!=='undefined'&&panelLive.started)updatePanelLive();
 }
 if(editTypeSel){editTypeSel.addEventListener('change',()=>{if(!conesEnabled)return;setEditType(editTypeSel.value);});}
 function setMode(m){
@@ -675,8 +675,6 @@ function openMapEdit(o){
   mapEdit.classList.toggle('open',o);
   setConesEnabled(o);
   grid.isVisible=o;axes.isVisible=o;
-  if(o){updatePanelLive();}
-  else{stopPanelLive();}
 }
 mapBtn.addEventListener('click',()=>{
   openSettings(false);
@@ -732,8 +730,8 @@ function panApply(dt){
 // ── 3D-миниатюры типов объектов (рендер через RenderTargetTexture в сцене) ──
 const THUMBS={cones:null,lines:null,curb:null,fence:null,estacada:null};
 function previewFrame(type){
-  if(type==='estacada')return{g:4.6,r:4.5,t:0.12};
-  return{g:2,r:2.2,t:type==='cones'?0.35:type==='fence'?0.85:type==='curb'?0.15:0.05};
+  return{a:(type==='fence'||type==='curb')?Math.PI/2:Math.PI/4,
+    b:type==='cones'?1.3:type==='fence'?1.42:type==='lines'?1:1.15};
 }
 function buildTypedPreview(type,scene,parent){
   const n=new BABYLON.TransformNode('tp'+(++drawSeq),scene);
@@ -787,88 +785,42 @@ function thumbCluster(type){
   R.position.set(-9999,0,0);
   const gm=new BABYLON.StandardMaterial('thGround'+type,scene);
   gm.diffuseColor=new BABYLON.Color3(0.17,0.18,0.21);gm.specularColor=new BABYLON.Color3(0,0,0);
-  const g=BABYLON.MeshBuilder.CreateGround('thG'+type,{width:F.g,height:F.g},scene);
+  const g=BABYLON.MeshBuilder.CreateGround('thG'+type,{width:12,height:12},scene);
   g.parent=R;g.material=gm;
   buildTypedPreview(type,scene,R);
-  return{root:R,cy:F.t};
+  return{root:R};
 }
-function captureThumb(type){
+const THUMB_SIZE=256,THUMB_MASK=0x20000000,THUMB_K=2;
+async function captureThumb(type){
+  const root=thumbCluster(type).root;
   try{
-    const{root,cy}=thumbCluster(type);
     const F=previewFrame(type);
-    const cam=new BABYLON.ArcRotateCamera('thCam'+type,Math.PI/4,Math.PI/2.6,F.r,
-      new BABYLON.Vector3(-9999,cy,0),scene);
-    cam.lowerAlphaLimit=Math.PI/4;cam.upperAlphaLimit=Math.PI/4;
-    cam.lowerBetaLimit=Math.PI/2.6;cam.upperBetaLimit=Math.PI/2.6;
-    cam.lowerRadiusLimit=F.r;cam.upperRadiusLimit=F.r;
-    const W=256,H=256;
-    const rtt=new BABYLON.RenderTargetTexture('thRtt'+type,{width:W,height:H},scene,false);
-    rtt.activeCamera=cam;
-    rtt.renderList=root.getChildMeshes();
-    const oldClear=scene.clearColor.clone();
-    scene.clearColor=new BABYLON.Color4(0.05,0.086,0.125,1);
-    try{rtt.render();}catch(e1){}
-    scene.clearColor=oldClear;
-    try{
-      const buf=rtt.readPixels(0,0,W,H);
-      const clamped=new Uint8ClampedArray(buf.buffer,buf.byteOffset,buf.byteLength);
-      const ic=document.createElement('canvas');ic.width=W;ic.height=H;
-      const gc=ic.getContext('2d');
-      gc.putImageData(new ImageData(clamped,W,H),0,0);
-      THUMBS[type]=ic.toDataURL('image/png');
-    }catch(e2){}
-    rtt.dispose();cam.dispose();root.dispose();
+    const kids=root.getChildMeshes();
+    kids.forEach(m=>{m.computeWorldMatrix(true);m.layerMask=THUMB_MASK;});
+    const lo=[1e9,1e9,1e9],hi=[-1e9,-1e9,-1e9];
+    kids.filter(m=>!/^thG/.test(m.name)).forEach(m=>{
+      m.refreshBoundingInfo();
+      const b=m.getBoundingInfo().boundingBox;
+      ['x','y','z'].forEach((k,i)=>{lo[i]=Math.min(lo[i],b.minimumWorld[k]);hi[i]=Math.max(hi[i],b.maximumWorld[k]);});
+    });
+    const size=Math.max(hi[0]-lo[0],hi[1]-lo[1],hi[2]-lo[2]);
+    const cam=new BABYLON.ArcRotateCamera('thCam'+type,F.a,F.b,Math.max(size*THUMB_K,0.4),
+      new BABYLON.Vector3((lo[0]+hi[0])/2,(lo[1]+hi[1])/2,(lo[2]+hi[2])/2),scene);
+    cam.layerMask=THUMB_MASK;cam.minZ=0.01;cam.maxZ=size*60+100;
+    const png=await BABYLON.Tools.CreateScreenshotUsingRenderTargetAsync(scene.getEngine(),cam,THUMB_SIZE,'image/png',4);
+    THUMBS[type]=png.slice(0,5)==='data:'?png:'data:image/png;base64,'+png;
   }catch(e){}
+  root.dispose();
 }
-// ── Живые 3D-предпросмотры в галерее объектов ───────────
-const livePreviews={};
-function ensureLivePreview(type){
-  if(livePreviews[type]!==undefined)return livePreviews[type];
-  livePreviews[type]=null;
-  try{
-    const card=document.querySelector('#typeWin .tg-card[data-type="'+type+'"]');
-    if(!card)return null;
-    const cv=card.querySelector('canvas');
-    if(!cv.getContext('webgl')&&!cv.getContext('experimental-webgl'))return null;
-    const eng=new BABYLON.Engine(cv,true);
-    const s=new BABYLON.Scene(eng);
-    s.clearColor=new BABYLON.Color4(0.05,0.086,0.125,1);
-    const h=new BABYLON.HemisphericLight('lvH'+type,new BABYLON.Vector3(0.5,1,0.4),s);h.intensity=0.9;
-    const d=new BABYLON.DirectionalLight('lvD'+type,new BABYLON.Vector3(-0.5,-1,-0.4),s);d.intensity=0.7;d.position=new BABYLON.Vector3(3,6,2);
-    const F=previewFrame(type);
-    const gm=new BABYLON.StandardMaterial('lvGm'+type,s);
-    gm.diffuseColor=new BABYLON.Color3(0.17,0.18,0.21);gm.specularColor=new BABYLON.Color3(0,0,0);
-    const g=BABYLON.MeshBuilder.CreateGround('lvG'+type,{width:F.g,height:F.g},s);g.material=gm;
-    const rot=new BABYLON.TransformNode('lvRot'+type,s);
-    buildTypedPreview(type,s,rot);
-    rot.position.y=F.t;
-    const cam=new BABYLON.ArcRotateCamera('lvC'+type,Math.PI/4,Math.PI/2.6,F.r,new BABYLON.Vector3(0,F.t,0),s);
-    cam.lowerAlphaLimit=Math.PI/4;cam.upperAlphaLimit=Math.PI/4;
-    cam.lowerBetaLimit=Math.PI/2.6;cam.upperBetaLimit=Math.PI/2.6;
-    cam.lowerRadiusLimit=F.r;cam.upperRadiusLimit=F.r;
-    s.registerBeforeRender(()=>{rot.rotation.y+=0.016;});
-    livePreviews[type]={engine:eng,scene:s,canvas:cv,card:card};
-  }catch(e){livePreviews[type]=null;}
-  return livePreviews[type];
-}
-function startLive(type){
-  const p=ensureLivePreview(type);if(!p)return;
-  p.canvas.classList.add('on');
-  const fb=p.card?p.card.querySelector('.tg-fallback'):null;if(fb)fb.style.display='none';
-  p.engine.runRenderLoop(()=>p.scene.render());
-}
-function stopLive(type){
-  const p=livePreviews[type];
-  if(p){p.engine.stopRenderLoop();p.canvas.classList.remove('on');
-    const fb=p.card?p.card.querySelector('.tg-fallback'):null;if(fb)fb.style.display='';}
-}
+// ── Статичные 3D-превью объектов (рендер в основной сцене) ──
 function applyThumbs(){
   const fill=(el,type)=>{if(el&&THUMBS[type])el.innerHTML='<img src="'+THUMBS[type]+'" alt="">';};
   if(typeof typeIco!=='undefined'&&typeIco)fill(typeIco,editType);
   document.querySelectorAll('#typeWin .tg-card').forEach(c=>{const ico=c.querySelector('.tg-fallback');fill(ico,c.dataset.type);});
 }
-requestAnimationFrame(()=>requestAnimationFrame(()=>{
-  try{captureThumb('cones');captureThumb('lines');captureThumb('curb');captureThumb('fence');captureThumb('estacada');applyThumbs();}catch(e){}
+requestAnimationFrame(()=>requestAnimationFrame(async ()=>{
+  for(const t of ['cones','lines','curb','fence','estacada'])await captureThumb(t);
+  applyThumbs();
 }));
 
 // ── Окно-галерея объектов ───────────────────────────
@@ -877,8 +829,6 @@ const typeBackdrop=document.getElementById('typeBackdrop');
 function openTypeWin(o){
   typeWin.classList.toggle('open',o);
   typeBackdrop.classList.toggle('open',o);
-  if(o){startLive('cones');startLive('lines');startLive('curb');startLive('fence');startLive('estacada');}
-  else{stopLive('cones');stopLive('lines');stopLive('curb');stopLive('fence');stopLive('estacada');}
 }
 document.getElementById('editTypeBtn').addEventListener('click',()=>{if(!conesEnabled)return;openTypeWin(true);});
 document.getElementById('typeClose').addEventListener('click',()=>openTypeWin(false));
@@ -888,68 +838,6 @@ document.querySelectorAll('#typeWin .tg-card').forEach(c=>c.addEventListener('cl
   setEditType(c.dataset.type);
   openTypeWin(false);
 }));
-
-// ── Живой 3D-предпросмотр в кнопке панели редактора ─────
-const panelLive={eng:null,scene:null,root:null,node:null,started:false};
-function panelLiveEnsure(){
-  if(panelLive.eng)return true;
-  try{
-    const cv=document.getElementById('panelLiveCanvas');
-    if(!cv)return false;
-    if(!cv.getContext('webgl')&&!cv.getContext('experimental-webgl'))return false;
-    const eng=new BABYLON.Engine(cv,true);
-    const s=new BABYLON.Scene(eng);
-    s.clearColor=new BABYLON.Color4(0.06,0.1,0.14,0);
-    const h=new BABYLON.HemisphericLight('plH',new BABYLON.Vector3(0.5,1,0.4),s);h.intensity=0.9;
-    const d=new BABYLON.DirectionalLight('plD',new BABYLON.Vector3(-0.5,-1,-0.4),s);d.intensity=0.7;d.position=new BABYLON.Vector3(3,6,2);
-    const gm=new BABYLON.StandardMaterial('plGm',s);
-    gm.diffuseColor=new BABYLON.Color3(0.17,0.18,0.21);gm.specularColor=new BABYLON.Color3(0,0,0);
-    const g=BABYLON.MeshBuilder.CreateGround('plG',{width:2,height:2},s);g.material=gm;
-    const root=new BABYLON.TransformNode('plRoot',s);
-    const cam=new BABYLON.ArcRotateCamera('plC',Math.PI/4,Math.PI/2.6,2.2,new BABYLON.Vector3(0,0.3,0),s);
-    cam.lowerAlphaLimit=Math.PI/4;cam.upperAlphaLimit=Math.PI/4;
-    cam.lowerBetaLimit=Math.PI/2.6;cam.upperBetaLimit=Math.PI/2.6;
-    cam.lowerRadiusLimit=2.2;cam.upperRadiusLimit=2.2;
-    s.registerBeforeRender(()=>{root.rotation.y+=0.02;});
-    panelLive.eng=eng;panelLive.scene=s;panelLive.root=root;panelLive.cam=cam;
-  }catch(e){return false;}
-  return true;
-}
-function panelLiveBuild(t){
-  if(!panelLive.scene)return;
-  if(panelLive.node){const old=panelLive.node;panelLive.node=null;old.dispose();}
-  const n=new BABYLON.TransformNode('plNode'+t,panelLive.scene);
-  buildTypedPreview(t,panelLive.scene,n);
-  if(panelLive.cam){const F=previewFrame(t);
-    panelLive.cam.setRadius(F.r);
-    panelLive.cam.lowerRadiusLimit=panelLive.cam.upperRadiusLimit=F.r;
-    panelLive.cam.setTarget(new BABYLON.Vector3(0,F.t,0));}
-  n.parent=panelLive.root;
-  panelLive.node=n;
-}
-function updatePanelLive(){
-  if(!panelLiveEnsure())return;
-  if(typeof editType==='undefined')return;
-  panelLiveBuild(editType);
-  const cv=document.getElementById('panelLiveCanvas');
-  const acc=document.getElementById('typeIco');
-  if(cv){cv.classList.add('on');}
-  if(acc)acc.style.display='none';
-  if(!panelLive.started){
-    panelLive.started=true;
-    panelLive.eng.runRenderLoop(()=>panelLive.scene.render());
-  }
-}
-function stopPanelLive(){
-  if(panelLive.eng&&panelLive.started){
-    panelLive.started=false;
-    panelLive.eng.stopRenderLoop();
-  }
-  const acc=document.getElementById('typeIco');
-  if(acc)acc.style.display='';
-  const cv=document.getElementById('panelLiveCanvas');
-  if(cv)cv.classList.remove('on');
-}
 
 // ── Горячие клавиши редактора: 1/2/3, T (тип), C (очистить) ──
 addEventListener('keydown',e=>{
