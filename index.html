@@ -550,7 +550,9 @@ const canvas=document.getElementById('renderCanvas');
 const engine=new BABYLON.Engine(canvas,true,{stencil:true});
 const scene=new BABYLON.Scene(engine);
 const isMobile=/Android|iPhone|iPad|iPod/i.test(navigator.userAgent)||(navigator.maxTouchPoints>1&&Math.max(screen.width,screen.height)<1100);
-if(isMobile)engine.setHardwareScalingLevel(0.6);
+// hardwareScalingLevel: 1 = размер CSS, больше 1 = МЕНЬШЕ пикселей (экономия батареи).
+// Раньше стояло 0.6 — это наоборот увеличивало разрешение в 1.67 раза.
+if(isMobile)engine.setHardwareScalingLevel(1.25);
 let MIRROR_SIZE=isMobile?256:1024;
 scene.clearColor=new BABYLON.Color4(0.45,0.72,0.98,1);
 
